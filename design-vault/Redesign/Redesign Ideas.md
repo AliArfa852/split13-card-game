@@ -30,3 +30,4 @@ Scratchpad. Add one entry per idea — doesn't need to be polished, this is wher
 ## Log
 
 - **2026-08-30 — Split 13.** Promoted from an idea straight to a full draft spec: [[Split 13 - Game Rules]]. 4-player, 2v2 team capture game — split the deck 13 each, throw one card a turn, match the top of the stack to sweep it, highest team total wins. Open decisions tracked in [[Open Questions]].
+- **2026-08-30 — Split 13 v2.** All six v1 open questions confirmed: teams lock at room start (not re-forming per hand), table clears fully on every capture, capturing ends the turn, ties are a draw, turns get a 20s timer with random auto-throw on expiry (timer + both team scores + live stack value all shown to everyone), and bot difficulty (easy/normal/hard) becomes a room setting. [[Split 13 - Game Rules]] updated to v2 with all of it folded in.

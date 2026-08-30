@@ -1,7 +1,7 @@
 {
-  "name": "check-the-game-v2",
+  "name": "split-13",
   "version": "1.0.0",
-  "description": "\"Check!\" is a web-based, free-to-play online multiplayer card game. The primary goal is to have the lowest total card value in your hand at the end of a round. This project implements the card game with a Node.js/Socket.IO backend and a new, modern Next.js/React frontend.",
+  "description": "Split 13 is a four-player, two-versus-two online card game. The deck is split thirteen cards each; you throw one card a turn and capture the whole table stack by matching the top card. The team with the most captured points wins the hand.",
   "private": true,
   "workspaces": [
     "client",
@@ -31,6 +31,7 @@
     "lint": "npm run lint -w client",
     "check:majors": "node scripts/check-dependency-majors.mjs",
     "check:commits": "node scripts/check-commit-style.mjs",
+    "check:rules": "node scripts/check-split13-rules.mjs",
     "check:seed": "node scripts/check-seeded-shuffle.mjs",
     "check:hidden": "node scripts/check-hidden-cards.mjs",
     "check:penalty": "node scripts/check-penalty-placement.mjs",
@@ -43,6 +44,7 @@
     "probe": "node tools/probe/probe.mjs",
     "probe:install": "cd tools/probe && npm install && npx playwright install chromium",
     "typecheck": "tsc --noEmit -p shared-types/tsconfig.json && tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p client/tsconfig.json",
+    "verify:server": "npm run build:shared && tsc --noEmit -p shared-types/tsconfig.json && tsc --noEmit -p server/tsconfig.json && npm run build:server && npm run check:rules",
     "verify": "npm run check:majors && npm run check:commits && npm run build:shared && npm run typecheck && npm run lint && npm run format:check && npm run build:server && npm run check:seed && npm run check:hidden && npm run check:penalty && npm run check:totals && npm run check:peek && npm run check:rejoin && npm run check:refused && npm run check:malformed && npm run check:chat && npm run build:client",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -2,10 +2,11 @@
 
 Tracks progress converting this package from Check! to Split 13. Tags reflect how much Split-13-specific work each file needs, not whether the current Check! code works. These are the `npm run check:*` rule-integrity scripts run by `npm run verify`.
 
-Legend: [COMPLETE] no change needed · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
+Legend: [COMPLETE] done for Split 13 (either ported, rewritten, or needed no change) · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
 
 Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
 
+- check-split13-rules.mjs — [COMPLETE] — new, and the main rules gate. Drives 35 full hands through the real machine asserting points/cards conservation (A + B + stranded = 400 / 52), exactly 52 throws, clockwise order, A-B-A-B team alternation, capture always clearing the table, and the turn timer carrying a stalling player; then checks the redaction boundary and the scoring/tie branch directly. Wired up as `npm run check:rules`.
 - check-dependency-majors.mjs — [COMPLETE] — generic dependency-version guard, game-agnostic.
 - check-commit-style.mjs — [COMPLETE] — generic, game-agnostic.
 - check-seeded-shuffle.mjs — [WARNING] — the seeded-shuffle concept transfers; verify it targets Split 13's 13-cards-x4 deal instead of Check!'s 4-cards-x-N deal.
@@ -18,6 +19,6 @@ Updated: 2026-08-30. Update this file in the same pass as any change to a listed
 - check-malformed-payload.mjs — [COMPLETE] — generic input-validation guard, reusable as-is.
 - check-chat-retention.mjs — [COMPLETE] — generic chat-log behavior, reusable if Split 13 keeps in-game chat.
 
-## Planned / not yet created (Split 13-specific)
+## Note on the Check! scripts above
 
-- A capture-correctness check (e.g. captured stack total = sum of card point values, no card scored twice) — [MISSING]
+The Check!-specific ones (hidden cards, penalty placement, short peek, series totals) are still in the tree but are no longer part of `npm run verify:server`, since they assert mechanics Split 13 does not have. They are kept for reference until the client port is done, then should be deleted or rewritten.

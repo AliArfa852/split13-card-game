@@ -2,28 +2,31 @@
 
 Tracks progress converting this package from Check! to Split 13. Tags reflect how much Split-13-specific work each file needs, not whether the current Check! code works.
 
-Legend: [COMPLETE] no change needed · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
+Legend: [COMPLETE] done for Split 13 (either ported, rewritten, or needed no change) · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
 
 Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
 
 ## Top-level config
 
-- .env.example — [COMPLETE] — infra, game-agnostic.
-- package.json — [NEEDS WORK] — name/description still say "Check!"; rename for Split 13.
+- .env.example — [NEEDS WORK] — still documents Check!'s knobs (peek/matching windows, MAX_HAND_SIZE, CARDS_PER_PLAYER). Split 13 reads `TURN_TIMER_MS` (default 20000) and `BOT_THINK_MS` (default 1100).
+- package.json — [COMPLETE] — described for Split 13.
 - tsconfig.json — [COMPLETE]
 
 ## src/
 
-- index.ts — [NEEDS WORK] — Socket.IO server, connection lifecycle and `activeGameMachines` map are reusable transport; the `PLAYER_ACTION` dispatch and per-event payloads reference Check!'s action set (draw/swap/ability/etc.) and need to route to Split 13's much smaller one (throw only) plus bot-turn triggering.
-- game-machine.ts — [MISSING] — the existing 95KB file is Check!'s entire rules engine (draw pile, matching stage, LIFO ability stack, locking, etc.). None of Split 13's rules (deal 13 each, throw, capture-on-rank-match, team scoring) exist yet. Treat as unbuilt, not "needs edits" — this is the core rewrite. See design-vault/Redesign/Split 13 - Game Rules.md for the spec to implement against.
-- state-redactor.ts — [NEEDS WORK] — Check! redacts opponents' hidden hands; Split 13 has no hidden information at all (every player sees their own full 13-card hand at all times, per the design doc), so this file's entire purpose may not be needed — confirm with the user whether any redaction is still required (e.g. hiding other players' hand *contents*, if that's ever added) before deleting it outright.
-- types.ts — [NEEDS WORK] — server-local types will follow whatever shared-types/src/index.ts becomes.
-- lib/deck-utils.ts — [WARNING] — deck-building/shuffling logic is probably reusable (still a standard 52-card deck); verify the dealing function splits into four 13-card hands rather than Check!'s 4-card deals.
+- index.ts — [COMPLETE] — socket layer ported. Room settings now carry `botDifficulty` instead of `maxPlayers`; the full-table check reads `seats`; `ACTIONS_REQUIRING_PAYLOAD` covers the new action set; the INITIAL_PEEK re-emit is gone. Rooms, reconnect tokens, lobby codes, session map and the abandoned-game sweep are unchanged and still work.
+- game-machine.ts — [COMPLETE] — written from scratch for Split 13 (~720 lines, replacing Check!'s 95KB engine). Deal 13x4 from a shuffled deck, random starting seat, clockwise turns, throw-one-card, capture on rank match, full table clear, team scoring, 20s turn timer with random auto-throw, bot turns, scoring with draw handling, and Play Again that keeps seats/teams/team wins. `finishHand` is exported so the tie branch can be tested directly.
+- state-redactor.ts — [COMPLETE] — rewritten and much smaller. Split 13 hides exactly one thing: an opponent's hand CONTENTS. Own hand is sent in full (sorted), opponents' hands become `null` with `handCount` surviving, and the stack is public in full since every card in it was thrown face-up.
+- types.ts — [COMPLETE] — `ServerPlayer` (seat, team, isBot, 13-card hand) and `GameContext` (seats, stack, team scores/counts, playedRankCounts, botDifficulty, turn deadline, result, teamWins) rewritten for Split 13.
+- lib/deck-utils.ts — [COMPLETE] — `createDeck`/`shuffleDeck` kept; added `dealHands` (four 13-card hands, asserts a full deck), `sortHand` (rank first so equal ranks sit together — it is a matching game) and `emptyRankCounts`.
+- lib/bots.ts — [COMPLETE] — new. Three tiers per rules §11: EASY throws at random, NORMAL captures when it can then dumps its lowest-value card, HARD also captures then prefers throwing a card no opponent can still match (dumping its most expensive card when that is safe). Verified to behave differently: over the same seeds EASY produced 4 captures / 14 stranded where HARD produced 16 / 0.
 - lib/logger.ts — [COMPLETE]
-- lib/rng.ts — [COMPLETE] — generic seeded RNG, game-agnostic.
+- lib/rng.ts — [COMPLETE] — seeded RNG reused as-is; the rules check drives reproducible hands through it.
+
+## Verified
+
+`npm run verify:server` — shared-types and server both typecheck and build clean, and `npm run check:rules` passes: 35 full hands (all three bot tiers, plus a hand where the human never acts and the turn timer carries every one of their turns), the redaction boundary, and the scoring/tie branch.
 
 ## Planned / not yet created (Split 13-specific)
 
-- Bot/agent decision module (server-side AI move logic — see design-vault/Redesign/Split 13 - Game Rules.md §10 for the v1 heuristic) — [MISSING]
-- Team-scoring logic (pool captures per team, live score updates) — [MISSING]
-- Seat-to-team mapping / team assignment during lobby join — [MISSING]
+- Nothing outstanding on the server for a playable v1. Open items are per-seat bot difficulty (see design-vault/Redesign/Open Questions.md) and porting `.env.example`.

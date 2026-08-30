@@ -1,7 +1,7 @@
 {
   "name": "shared-types",
   "version": "1.0.0",
-  "description": "",
+  "description": "The TypeScript contract shared by the Split 13 client and server.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

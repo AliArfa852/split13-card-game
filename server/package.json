@@ -1,7 +1,7 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
+  "description": "Authoritative Split 13 game server: Socket.IO rooms plus the XState rules engine.",
   "main": "dist/index.js",
   "scripts": {
     "build": "rimraf ./dist ./tsconfig.tsbuildinfo && tsc",

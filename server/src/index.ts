@@ -23,7 +23,8 @@ import {
   ClientToServerEvents,
   ServerToClientEvents,
   AttemptRejoinResponse,
-  Card,
+  BotDifficulty,
+  SEAT_COUNT,
 } from "shared-types";
 
 type GameMachineActorRef = ActorRefFrom<typeof gameMachine>;
@@ -86,9 +87,9 @@ const ALLOWED_PLAYER_ACTIONS = new Set<string>(Object.values(PlayerActionType));
 // which stops the actor and takes the whole game down with it. Checking the
 // shape here keeps a bad message a rejected message.
 const ACTIONS_REQUIRING_PAYLOAD = new Set<string>([
-  PlayerActionType.SWAP_AND_DISCARD,
-  PlayerActionType.ATTEMPT_MATCH,
-  PlayerActionType.USE_ABILITY,
+  PlayerActionType.THROW_CARD,
+  PlayerActionType.CLAIM_SEAT,
+  PlayerActionType.SET_BOT_DIFFICULTY,
   PlayerActionType.REMOVE_PLAYER,
   PlayerActionType.SEND_CHAT_MESSAGE,
 ]);
@@ -281,11 +282,14 @@ io.on("connection", (socket: Socket) => {
       try {
         const gameId = newGameId();
         const playerId = nanoid();
-        // The host's table size, clamped server-side. Omitted or invalid
-        // falls through to the machine's env default.
-        const requestedSeats = Number(playerSetupData?.maxPlayers);
-        const maxPlayers = Number.isInteger(requestedSeats)
-          ? Math.min(6, Math.max(2, requestedSeats))
+        // Split 13's table size is fixed at SEAT_COUNT, so bot difficulty is
+        // the only room setting the host picks. Anything unrecognised falls
+        // through to the machine's default.
+        const requestedDifficulty = playerSetupData?.botDifficulty;
+        const botDifficulty = Object.values(BotDifficulty).includes(
+          requestedDifficulty as BotDifficulty,
+        )
+          ? (requestedDifficulty as BotDifficulty)
           : undefined;
         const finalPlayerSetupData = {
           ...playerSetupData,
@@ -299,7 +303,7 @@ io.on("connection", (socket: Socket) => {
         );
 
         const gameActor = createActor(gameMachine, {
-          input: { gameId, maxPlayers },
+          input: { gameId, botDifficulty },
         });
 
         // General listener for broadcasting game state to all in the room
@@ -451,10 +455,7 @@ io.on("connection", (socket: Socket) => {
           return;
         }
 
-        if (
-          Object.keys(currentState.context.players).length >=
-          currentState.context.maxPlayers
-        ) {
+        if (currentState.context.seats.every((seat) => seat !== null)) {
           logger.warn(
             {
               gameId,
@@ -585,20 +586,6 @@ io.on("connection", (socket: Socket) => {
         }
 
         broadcastGameState(gameId, gameActor);
-
-        // If the player reconnects during INITIAL_PEEK they may have missed the private
-        // INITIAL_PEEK_INFO packet.  Re-emit it so their client can flip the two cards.
-        if (snapshot.context.gameStage === GameStage.INITIAL_PEEK) {
-          const peekHand =
-            snapshot.context.players[playerId]?.hand
-              .slice(-2)
-              .filter((c): c is Card => c !== null) ?? [];
-          if (peekHand.length > 0) {
-            io.to(socket.id).emit(SocketEventName.INITIAL_PEEK_INFO, {
-              hand: peekHand,
-            });
-          }
-        }
       } catch (e: any) {
         logger.error({ err: e }, `[Server-Rejoin] Error`);
         if (callback)

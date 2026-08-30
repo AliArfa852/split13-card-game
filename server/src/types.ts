@@ -1,112 +1,86 @@
 import {
+  BotDifficulty,
   Card,
   CardRank,
-  PlayerId,
-  GameStage,
-  TurnPhase,
-  PlayerStatus,
-  AbilityType,
-  ActiveAbility,
-  RichGameLogMessage,
+  CaptureInfo,
   ChatMessage,
-  PublicPeekInfo,
-  PublicSwapInfo,
-  PublicPenaltyInfo,
+  GameStage,
+  HandResult,
+  PlayerId,
+  PlayerStatus,
+  RichGameLogMessage,
+  Team,
 } from "shared-types";
 import type { Rng } from "./lib/rng.js";
-
-export interface ServerActiveAbility extends Omit<ActiveAbility, "stage"> {
-  stage: "peeking" | "swapping";
-  source: "discard" | "stack" | "stackSecondOfPair";
-  remainingPeeks?: number;
-}
 
 export interface ServerPlayer {
   id: PlayerId;
   name: string;
   socketId: string;
-  hand: (Card | null)[];
+  /** 0-3. Fixed once the host starts the game; decides team and turn slot. */
+  seatIndex: number;
+  team: Team;
+  isBot: boolean;
   isReady: boolean;
-  isDealer: boolean;
-  hasCalledCheck: boolean;
-  isLocked: boolean;
-  score: number;
   isConnected: boolean;
   status: PlayerStatus;
-  pendingDrawnCard: { card: Card; source: "deck" | "discard" } | null;
+  /** The player's real cards. Redacted for everyone but the owner before it
+   *  leaves the server — see state-redactor.ts. */
+  hand: Card[];
   forfeited: boolean;
 }
 
 export interface GameContext {
   gameId: string;
   rng: Rng;
-  deck: Card[];
   players: Record<PlayerId, ServerPlayer>;
-  discardPile: Card[];
-  turnOrder: PlayerId[];
-  gameMasterId: PlayerId | null;
-  currentPlayerId: PlayerId | null;
-  currentTurnSegment: TurnPhase | null;
+  /** Index is the seat, value is who holds it. Length SEAT_COUNT. This IS the
+   *  turn order: play is plain clockwise, and seats alternate team, which is
+   *  what produces A -> B -> A -> B without any special-casing. */
+  seats: (PlayerId | null)[];
+  hostId: PlayerId | null;
   gameStage: GameStage;
-  matchingOpportunity: {
-    cardToMatch: Card;
-    originalPlayerID: PlayerId;
-    remainingPlayerIDs: PlayerId[];
-    startTimestamp: number;
-    durationMs: number;
-  } | null;
-  abilityStack: ServerActiveAbility[];
-  checkDetails: {
-    callerId: PlayerId;
-    finalTurnOrder: PlayerId[];
-    finalTurnIndex: number;
-  } | null;
-  gameover: {
-    winnerIds: PlayerId[];
-    loserId: PlayerId | null;
-    playerScores: Record<PlayerId, number>;
-  } | null;
-  lastRoundLoserId: PlayerId | null;
-  /** Cumulative round wins per player, for the lobby's lifetime. Unlike
-   *  scores this survives resetForNewRound; the redactor drops entries for
-   *  players who have left. */
-  playerWins: Record<PlayerId, number>;
-  /** Cumulative round scores per player, accumulated and surviving exactly as
-   *  playerWins does. Every player is credited each round, disqualified ones
-   *  included, since a total is the sum of the rounds you played. */
-  playerTotals: Record<PlayerId, number>;
-  /** Players who signalled "play again" at GAMEOVER (advisory rematch tally;
-   *  the host still starts the round). Reset each new round. */
-  rematchVotes: PlayerId[];
-  /** Bumped by resetForNewRound on each Play Again. Clients key their
-   *  accumulated log/chat on this: same epoch = append-only merge, new
-   *  epoch = drop history and start from the incoming arrays. */
-  roundEpoch: number;
-  log: RichGameLogMessage[];
-  chat: ChatMessage[];
-  discardPileIsSealed: boolean;
-  /** Ids of cards locked for the round by a successful match. A locked card can
-   *  never be drawn from the discard pile. Reset each deal / new round. */
-  lockedCardIds: string[];
-  errorState: {
-    message: string;
-    errorType: "DECK_EMPTY" | "NETWORK_ERROR";
-    affectedPlayerId?: PlayerId;
-  } | null;
-  maxPlayers: number;
-  cardsPerPlayer: number;
-  winnerId: PlayerId | null;
-  publicPeek: PublicPeekInfo | null;
-  publicSwap: PublicSwapInfo | null;
-  publicPenalty: PublicPenaltyInfo | null;
+  /** Whose turn it is, as a seat index. Null outside PLAYING. */
+  currentSeat: number | null;
+
+  /** The table stack, oldest first. The last element is the card that must be
+   *  matched to capture. Emptied completely on every capture (rules §7). */
+  stack: Card[];
+
+  teamScores: Record<Team, number>;
+  teamCardCounts: Record<Team, number>;
+  lastCapture: CaptureInfo | null;
+
+  /** Copies of each rank already thrown this hand. Drives the hard bot and the
+   *  client's dead-rank display. Reset on every deal. */
+  playedRankCounts: Record<CardRank, number>;
+
+  botDifficulty: BotDifficulty;
+
   turnDeadline: number | null;
   turnTimerMs: number;
+
+  result: HandResult | null;
+
+  /** Cumulative hands won per team for the lobby's lifetime. Survives a new
+   *  deal; a draw increments neither side. */
+  teamWins: Record<Team, number>;
+  rematchVotes: PlayerId[];
+  roundEpoch: number;
+
+  log: RichGameLogMessage[];
+  chat: ChatMessage[];
+
+  errorState: {
+    message: string;
+    errorType: "INVALID_ACTION" | "NETWORK_ERROR";
+    affectedPlayerId?: PlayerId;
+  } | null;
 }
 
 export type GameInput = {
   gameId: string;
-  maxPlayers?: number;
-  cardsPerPlayer?: number;
+  botDifficulty?: BotDifficulty;
   /** Omitted in production, which uses the system source. Supplying one makes
    *  the shuffle and the card ids reproducible, so a game can be replayed. */
   seed?: number;

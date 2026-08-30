@@ -1,189 +1,100 @@
 import {
-  Card,
-  FacedownCard,
-  PublicCard,
+  cardsPoints,
+  ClientSplitGameState,
   Player,
   PlayerId,
-  ClientCheckGameState,
-  GameStage,
-  RichGameLogMessage,
 } from "shared-types";
 import type { GameContext } from "./game-machine.js";
+import { sortHand } from "./lib/deck-utils.js";
 import logger from "./lib/logger.js";
 
 /**
- * Generates a player-specific view of the game state, redacting sensitive information.
- * @param snapshot The full snapshot from the server's machine.
- * @param viewingPlayerId The ID of the player for whom this view is being generated.
- * @returns A redacted game state object suitable for sending to the client.
+ * Builds one player's view of the game.
+ *
+ * Split 13 has far less to hide than Check! did — a player always sees their
+ * own thirteen cards, and every card ever thrown was thrown face-up, so the
+ * stack is public in full. Exactly one thing is private: the CONTENTS of an
+ * opponent's hand. That is redacted to `null` here, with only `handCount`
+ * surviving, and it is the single leak this function exists to prevent. A
+ * player who could read another hand would know every capture in advance.
  */
 export const generatePlayerView = (
   snapshot: { context: GameContext },
   viewingPlayerId: string,
-): ClientCheckGameState => {
-  const { context: fullGameContext } = snapshot;
+): ClientSplitGameState => {
+  const { context } = snapshot;
   logger.debug(
-    { gameId: fullGameContext.gameId, viewingPlayerId },
+    { gameId: context.gameId, viewingPlayerId },
     "Generating player view",
   );
 
   const clientPlayers: Record<PlayerId, Player> = {};
 
-  for (const pId in fullGameContext.players) {
-    const serverPlayer = fullGameContext.players[pId];
-    const isViewingPlayer = pId === viewingPlayerId;
+  for (const playerId in context.players) {
+    const serverPlayer = context.players[playerId];
+    const isViewingPlayer = playerId === viewingPlayerId;
 
-    const revealAll =
-      fullGameContext.gameStage === GameStage.SCORING ||
-      fullGameContext.gameStage === GameStage.GAMEOVER;
-
-    const clientHand: (PublicCard | null)[] = serverPlayer.hand.map((card) => {
-      // An empty gap stays an empty gap for everyone.
-      if (card === null) return null;
-      // During scoring/gameover every hand is revealed for the final tally.
-      if (revealAll) return card;
-
-      // A face-down card is hidden from EVERYONE, including its owner.
-      // "Check!" is a memory game: a player only ever learns their own cards
-      // through the initial peek and King/Queen ability peeks. Those are
-      // delivered out-of-band via the private INITIAL_PEEK_INFO /
-      // ABILITY_PEEK_RESULT socket events (the client tracks them in its own
-      // `visibleCards` state and re-hides the slot when they expire). Sending
-      // the owner their full hand here would let a cheating player read it
-      // straight off the websocket and nullify the memory challenge — the
-      // one piece of information the whole game is built on. Only the id
-      // travels, so the client can still key and animate the slot; the card a
-      // player is actively holding after a draw rides in pendingDrawnCard
-      // (below), not here.
-      return { facedown: true as const, id: card.id };
-    });
-
-    let clientPendingDrawnCard: {
-      card: PublicCard;
-      source: "deck" | "discard";
-    } | null = null;
-    if (serverPlayer.pendingDrawnCard) {
-      // A card taken from the discard pile was already public knowledge, so
-      // everyone keeps seeing its face (real-life parity). Deck draws stay
-      // hidden from everyone but the drawer.
-      if (
-        isViewingPlayer ||
-        serverPlayer.pendingDrawnCard.source === "discard"
-      ) {
-        clientPendingDrawnCard = {
-          card: serverPlayer.pendingDrawnCard.card,
-          source: serverPlayer.pendingDrawnCard.source,
-        };
-      } else {
-        clientPendingDrawnCard = {
-          card: { id: serverPlayer.pendingDrawnCard.card.id, facedown: true },
-          source: serverPlayer.pendingDrawnCard.source,
-        };
-      }
-    }
-
-    clientPlayers[pId] = {
+    clientPlayers[playerId] = {
       id: serverPlayer.id,
       name: serverPlayer.name,
-      hand: clientHand,
-      status: serverPlayer.status,
+      seatIndex: serverPlayer.seatIndex,
+      team: serverPlayer.team,
+      isBot: serverPlayer.isBot,
+      isHost: context.hostId === serverPlayer.id,
       isReady: serverPlayer.isReady,
-      isDealer: serverPlayer.isDealer,
-      hasCalledCheck: serverPlayer.hasCalledCheck,
-      isLocked: serverPlayer.isLocked,
-      score: serverPlayer.score,
       isConnected: serverPlayer.isConnected,
+      status: serverPlayer.status,
+      // Your own hand, sorted for display. Everyone else's is a count.
+      hand: isViewingPlayer ? sortHand(serverPlayer.hand) : null,
+      handCount: serverPlayer.hand.length,
       forfeited: serverPlayer.forfeited,
-      pendingDrawnCard: clientPendingDrawnCard,
     };
   }
 
-  const clientLog = fullGameContext.log.filter(
-    (entry: RichGameLogMessage) =>
-      entry.type === "public" ||
-      (entry.type === "private" && entry.actor?.id === viewingPlayerId),
+  const currentPlayerId =
+    context.currentSeat !== null ? context.seats[context.currentSeat] : null;
+
+  const cardsRemaining = Object.values(context.players).reduce(
+    (total, player) => total + player.hand.length,
+    0,
   );
 
-  // Broadcasts carry only the recent tail — log and chat are append-only and
-  // the client merges by id, keeping its full accumulated copy (rejoin gets
-  // the complete log out-of-band). Without the cap every broadcast grew with
-  // the length of the game.
-  const BROADCAST_LOG_TAIL = 30;
-  const BROADCAST_CHAT_TAIL = 30;
-
-  const clientGameState: ClientCheckGameState = {
-    gameId: fullGameContext.gameId,
+  return {
+    gameId: context.gameId,
     viewingPlayerId,
-    gameMasterId: fullGameContext.gameMasterId,
+    hostId: context.hostId,
     players: clientPlayers,
-    deckSize: fullGameContext.deck.length,
-    deckTop:
-      fullGameContext.deck.length > 0
-        ? {
-            facedown: true,
-            id: fullGameContext.deck[fullGameContext.deck.length - 1]!.id,
-          }
-        : null,
-    discardPile: fullGameContext.discardPile.slice(-2),
-    discardPileSize: fullGameContext.discardPile.length,
-    turnOrder: fullGameContext.turnOrder,
-    // context.gameStage is the single source of truth. Deriving the stage from
-    // the machine's state value breaks whenever the machine is in a non-stage
-    // node such as the error/recovery state.
-    gameStage: fullGameContext.gameStage,
-    currentPlayerId: fullGameContext.currentPlayerId,
-    turnPhase: fullGameContext.currentTurnSegment,
-    abilityStack: fullGameContext.abilityStack,
-    matchingOpportunity: fullGameContext.matchingOpportunity,
-    checkDetails: fullGameContext.checkDetails,
-    winnerId: fullGameContext.winnerId,
-    gameover: fullGameContext.gameover,
-    lastRoundLoserId: fullGameContext.lastRoundLoserId,
-    // Only include wins for players still at the table to avoid stale entries
-    // when someone leaves mid-session.
-    playerWins: Object.fromEntries(
-      Object.entries(fullGameContext.playerWins ?? {}).filter(
-        ([id]) => !!fullGameContext.players[id],
-      ),
+    seats: [...context.seats],
+    gameStage: context.gameStage,
+    currentPlayerId,
+    currentSeat: context.currentSeat,
+
+    stack: [...context.stack],
+    stackValue: cardsPoints(context.stack),
+
+    teamScores: { ...context.teamScores },
+    teamCardCounts: { ...context.teamCardCounts },
+    lastCapture: context.lastCapture,
+
+    playedRankCounts: { ...context.playedRankCounts },
+    cardsRemaining,
+
+    botDifficulty: context.botDifficulty,
+
+    turnDeadline: context.turnDeadline,
+    turnTimerMs: context.turnTimerMs,
+
+    result: context.result,
+
+    teamWins: { ...context.teamWins },
+    rematchVotes: [...context.rematchVotes],
+    roundEpoch: context.roundEpoch,
+
+    log: context.log.filter(
+      (entry) => entry.type === "public" || entry.actor?.id === viewingPlayerId,
     ),
-    playerTotals: Object.fromEntries(
-      Object.entries(fullGameContext.playerTotals ?? {}).filter(
-        ([id]) => !!fullGameContext.players[id],
-      ),
-    ),
-    // Filter to players still at the table so a voter who left doesn't inflate
-    // the tally (votes are also reset each new round).
-    rematchVotes: fullGameContext.rematchVotes.filter(
-      (id) => !!fullGameContext.players[id],
-    ),
-    roundEpoch: fullGameContext.roundEpoch ?? 0,
-    log: clientLog.slice(-BROADCAST_LOG_TAIL),
-    chat: (fullGameContext.chat ?? []).slice(-BROADCAST_CHAT_TAIL),
-    discardPileIsSealed: fullGameContext.discardPileIsSealed,
-    discardTopIsLocked: (() => {
-      const top = fullGameContext.discardPile.at(-1);
-      return !!top && fullGameContext.lockedCardIds.includes(top.id);
-    })(),
-    // Positions only — card faces are never part of publicPeek.
-    publicPeek: fullGameContext.publicPeek,
-    // Positions only — card faces are never part of publicSwap.
-    publicSwap: fullGameContext.publicSwap,
-    // Position only — the penalty card's face stays hidden from others.
-    publicPenalty: fullGameContext.publicPenalty,
-    turnDeadline: fullGameContext.turnDeadline,
-    turnTimerMs: fullGameContext.turnTimerMs,
-    maxPlayers: fullGameContext.maxPlayers,
+    chat: context.chat,
+
     serverNow: Date.now(),
   };
-
-  logger.debug(
-    {
-      gameId: fullGameContext.gameId,
-      viewingPlayerId,
-      stage: clientGameState.gameStage,
-      turnPhase: clientGameState.turnPhase,
-    },
-    "Finished generating player view",
-  );
-  return clientGameState;
 };

@@ -2,7 +2,7 @@
 
 Tracks progress converting this package from Check! to Split 13. Tags reflect how much Split-13-specific work each file needs, not whether the current Check! code works.
 
-Legend: [COMPLETE] no change needed · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
+Legend: [COMPLETE] done for Split 13 (either ported, rewritten, or needed no change) · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
 
 Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
 
@@ -60,7 +60,7 @@ Updated: 2026-08-30. Update this file in the same pass as any change to a listed
 - CheckMoment.tsx — [NEEDS WORK] — Split 13 has no "Call Check"; remove or repurpose.
 - GameBoard.tsx — [NEEDS WORK] — major: needs 4-seat layout with team score piles instead of Check!'s per-player grid layout.
 - GameEventCaption.tsx — [WARNING] — overlay mechanism likely reusable; event text/types need Split 13's vocabulary (capture, throw) instead of Check!'s (match, peek, ability).
-- GameHeader.tsx — [NEEDS WORK] — needs team scores + hand progress instead of Check!'s per-turn-phase info.
+- GameHeader.tsx — [NEEDS WORK] — needs a 20s turn timer, both teams' live scores, and the live total value of the table stack, instead of Check!'s per-turn-phase info (see design-vault/Redesign/Split 13 - Game Rules.md §5, §9).
 - GameLobby.tsx — [NEEDS WORK] — major: fixed 4 seats mapped to Team A/B, bot-fill, instead of Check!'s 2-6 variable lobby.
 - GameUI.tsx — [NEEDS WORK] — composition root; follows once its children are rebuilt.
 - HandGrid.tsx — [NEEDS WORK] — Check!'s 2x2 grid has no Split 13 equivalent (13-card fanned hand instead); replace.
@@ -144,6 +144,9 @@ Updated: 2026-08-30. Update this file in the same pass as any change to a listed
 
 ## Planned / not yet created (Split 13-specific)
 
-- Seat/team picker UI (lobby) — [MISSING]
+- Seat/team picker UI (lobby, locked once host starts) — [MISSING]
 - Team scoreboard component (live A vs B totals) — [MISSING]
+- Live table-stack value indicator (§9 of the rules doc) — [MISSING]
+- 20s turn-timer countdown UI, visible to all players — [MISSING]
 - Bot/agent indicator in seat UI (shows which seats are bots) — [MISSING]
+- Room-settings UI for bot difficulty (easy/normal/hard, room-wide) — [MISSING]

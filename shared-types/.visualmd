@@ -2,31 +2,27 @@
 
 Tracks progress converting this package from Check! to Split 13. Tags reflect how much Split-13-specific work each file needs, not whether the current Check! code works.
 
-Legend: [COMPLETE] no change needed · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
+Legend: [COMPLETE] done for Split 13 (either ported, rewritten, or needed no change) · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
 
 Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
 
 ## Top-level config
 
-- package.json — [NEEDS WORK] — name/description still say "Check!"; rename for Split 13.
+- package.json — [COMPLETE] — renamed and described for Split 13.
 - tsconfig.json — [COMPLETE]
 
 ## src/
 
-- index.ts — [NEEDS WORK] — major: this is the whole client/server contract, and almost every shape in it is Check!-specific.
-  - `GameStage`, `TurnPhase` — replace: Split 13 has no draw/discard/matching/ability phases, just deal → throw-loop → hand-over.
-  - `PlayerStatus` — mostly replace: no `CALLED_CHECK`/`DISQUALIFIED` in Split 13; needs a bot-vs-human distinction instead.
-  - `Card`, `Suit`, `CardRank`, `FacedownCard`/`PublicCard` — `Card`/`Suit`/`CardRank` reusable as-is (still a standard 52-card deck); `FacedownCard`/`PublicCard` are Check!-specific hidden-card plumbing that Split 13 likely doesn't need (no hidden hands) — confirm before keeping.
-  - `Player`, `ClientCheckGameState` — full rewrite: no `pendingDrawnCard`, `publicPeek`/`publicSwap`/`publicPenalty`, `abilityStack`, `matchingOpportunity`, `discardPileIsSealed`/`discardTopIsLocked`; needs `team` (A/B), `isBot`, a single capture-stack shape, and per-team score fields instead of per-player.
-  - `PlayerActionType` — full rewrite: collapses to essentially `THROW_CARD` plus lobby actions (start, ready, leave, seat/team pick) and bot-related actions if any are player-triggerable.
-  - `ActiveAbility`, `AbilityType`, `Peek/Swap/SkipAbilityPayload`, `ClientAbilityContext` — [MISSING equivalent, not needed] — Split 13 has no special-card abilities; remove.
-  - `SocketEventName`, `ServerToClientEvents`/`ClientToServerEvents` — mostly reusable shape (ack-based create/join/rejoin, broadcast state/log/chat); drop ability/peek-specific events (`ABILITY_PEEK_RESULT`, `INITIAL_PEEK_INFO`).
-  - `RichGameLogMessage` — [COMPLETE] shape is generic; the `tags` union (`ability`, `penalty`, etc.) needs updating to Split 13's event vocabulary (e.g. `capture`).
-  - `ChatMessage`, `BasicResponse`, `CreateGameResponse`/`JoinGameResponse`/`AttemptRejoinResponse`, `InitialPlayerSetupData`/`CreateGamePayload` — [COMPLETE] — generic lobby/chat plumbing, reusable as-is (CreateGamePayload's `maxPlayers?` becomes moot since Split 13 is fixed at 4, but harmless to leave optional).
+- index.ts — [COMPLETE] — rewritten for Split 13 and building clean. Now holds:
+  - Table constants `SEAT_COUNT` (4), `CARDS_PER_PLAYER` (13), `DEFAULT_TURN_TIMER_MS` (20s).
+  - `GameStage` (WAITING_FOR_PLAYERS, DEALING, PLAYING, SCORING, GAMEOVER), `Team` (A/B), `PlayerStatus`, `BotDifficulty` (EASY/NORMAL/HARD).
+  - `Card`/`Suit`/`CardRank` carried over unchanged — still a standard 52-card deck.
+  - Scoring: `CARD_POINTS`, `cardPoints`, `cardsPoints`, `FULL_DECK_POINTS` (400), `teamForSeat`, `opposingTeam`.
+  - `Player` (hand populated only for the viewing player, `handCount` always), `CaptureInfo`, `HandResult`, `ClientSplitGameState`.
+  - `PlayerActionType` collapsed to lobby actions + `THROW_CARD` + rematch + chat; `ThrowCardPayload`, `ClaimSeatPayload`, `SetBotDifficultyPayload`.
+  - Socket contract kept (ack-based create/join/rejoin, broadcast state/log/chat); peek/ability events removed.
+  - All Check!-only shapes gone: `TurnPhase`, `FacedownCard`/`PublicCard`, `ActiveAbility`, ability payloads, `PublicPeek/Swap/Penalty`, matching-opportunity, seal/lock flags.
 
-## Planned / not yet created (Split 13-specific)
+## Notes
 
-- `Team` enum/type (A/B) — [MISSING]
-- `CaptureStack` type (replaces discard pile + matching-opportunity shapes) — [MISSING]
-- Team score fields on the client game-state type — [MISSING]
-- Bot-related types (e.g. `isBot` on `Player`, any bot-difficulty type if tiers are added later) — [MISSING]
+- `RichGameLogMessage.tags` now uses Split 13's vocabulary: `throw` and `capture` replaced `ability` and `penalty`.
