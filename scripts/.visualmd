@@ -1,0 +1,23 @@
+# scripts — Progress (Split 13 rewrite)
+
+Tracks progress converting this package from Check! to Split 13. Tags reflect how much Split-13-specific work each file needs, not whether the current Check! code works. These are the `npm run check:*` rule-integrity scripts run by `npm run verify`.
+
+Legend: [COMPLETE] no change needed · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
+
+Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
+
+- check-dependency-majors.mjs — [COMPLETE] — generic dependency-version guard, game-agnostic.
+- check-commit-style.mjs — [COMPLETE] — generic, game-agnostic.
+- check-seeded-shuffle.mjs — [WARNING] — the seeded-shuffle concept transfers; verify it targets Split 13's 13-cards-x4 deal instead of Check!'s 4-cards-x-N deal.
+- check-hidden-cards.mjs — [NEEDS WORK] — checks that hidden hands never leak; Split 13 has no hidden hands at all (design doc: every player sees their own full hand), so this check may become moot — confirm before removing.
+- check-penalty-placement.mjs — [NEEDS WORK] — Split 13 has no penalty-card mechanic; remove or repurpose.
+- check-series-totals.mjs — [NEEDS WORK] — score-totals concept transfers (team totals across a hand); needs rework for team-pooled scoring instead of per-player.
+- check-short-peek.mjs — [NEEDS WORK] — Split 13 has no peek mechanic; remove.
+- check-rejoin-ownership.mjs — [WARNING] — generic reconnect/seat-ownership concept; reusable if Split 13 keeps rejoin support, verify against the new seat/team model.
+- check-refused-action-answered.mjs — [COMPLETE] — generic (every rejected action gets an error response); reusable once the new, smaller action set is in place.
+- check-malformed-payload.mjs — [COMPLETE] — generic input-validation guard, reusable as-is.
+- check-chat-retention.mjs — [COMPLETE] — generic chat-log behavior, reusable if Split 13 keeps in-game chat.
+
+## Planned / not yet created (Split 13-specific)
+
+- A capture-correctness check (e.g. captured stack total = sum of card point values, no card scored twice) — [MISSING]

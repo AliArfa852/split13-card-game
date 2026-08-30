@@ -69,3 +69,6 @@ CLAUDE.local.md
 AGENTS.md
 .claude/
 .gemini/
+
+# Obsidian vault settings (personal editor state, not project content)
+design-vault/.obsidian/

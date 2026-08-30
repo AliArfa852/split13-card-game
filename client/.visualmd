@@ -1,0 +1,149 @@
+# client — Progress (Split 13 rewrite)
+
+Tracks progress converting this package from Check! to Split 13. Tags reflect how much Split-13-specific work each file needs, not whether the current Check! code works.
+
+Legend: [COMPLETE] no change needed · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
+
+Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
+
+## Top-level config
+
+- .env.example — [COMPLETE] — infra, game-agnostic.
+- .gitignore — [COMPLETE]
+- components.json — [COMPLETE] — shadcn config, game-agnostic.
+- declarations.d.ts — [COMPLETE]
+- eslint.config.mjs — [COMPLETE]
+- next.config.ts — [COMPLETE]
+- package.json — [NEEDS WORK] — name/description still say "Check!"; rename for Split 13.
+- postcss.config.mjs — [COMPLETE]
+- tsconfig.json — [COMPLETE]
+
+## app/
+
+- app/layout.tsx — [NEEDS WORK] — shell is reusable; site metadata/title still Check!'s.
+- app/page.tsx — [NEEDS WORK] — major: landing page, copy and modals are all Check!-specific; Split 13 needs a seat/team picker instead of a max-players picker.
+- app/providers.tsx — [NEEDS WORK] — shell reusable, but wires up `uiMachine`, which itself needs a full rewrite (see machines/uiMachine.ts below).
+- app/globals.css — [NEEDS WORK] — base styles reusable; rebrand pass (palette/theme) still open.
+- app/manifest.ts — [NEEDS WORK] — rebrand (name, icons, theme color).
+- app/opengraph-image.tsx — [NEEDS WORK] — rebrand social card.
+- app/apple-icon.tsx — [NEEDS WORK] — rebrand icon.
+- app/icon.svg — [NEEDS WORK] — rebrand icon.
+- app/icon-512/route.tsx — [NEEDS WORK] — rebrand icon.
+- app/maskable-icon/route.tsx — [NEEDS WORK] — rebrand icon.
+- app/robots.ts — [COMPLETE]
+- app/sitemap.ts — [COMPLETE] — check it still lists the right routes once `rules` content changes.
+- app/fonts/ (NunitoSans-ExtraBold.ttf, NunitoSans-Regular.ttf) — [COMPLETE] — reusable unless rebrand changes the typeface.
+- app/game/layout.tsx — [COMPLETE] — thin generic shell.
+- app/game/[gameId]/page.tsx — [COMPLETE] — thin generic shell.
+- app/game/[gameId]/GameClient.tsx — [COMPLETE] — thin generic shell, renders `<GameUI />`.
+- app/rules/page.tsx — [NEEDS WORK] — shell reusable, content is Check!'s rules.
+- app/rules/RulesContent.tsx — [NEEDS WORK] — full rewrite: this is Check!'s rules text, needs Split 13's (see design-vault/Redesign/Split 13 - Game Rules.md).
+- app/rules/illustrations.tsx — [NEEDS WORK] — illustrations depict Check!'s 2x2 grid/abilities; Split 13 needs different diagrams (13-card hand, capture stack).
+
+## components/cards/ (low-level card rendering — mostly game-agnostic)
+
+- CardAnimationRoot.tsx — [COMPLETE]
+- CardBack.tsx — [COMPLETE]
+- CardFlight.tsx — [COMPLETE] — generic flight animation.
+- cardRing.ts — [COMPLETE]
+- PlayingCard.tsx — [COMPLETE]
+- VisualCardStack.tsx — [WARNING] — check it generalizes to a single growing capture stack, not just Check!'s draw/discard piles.
+
+## components/game/ (Check!-specific gameplay UI — the bulk of the rewrite)
+
+- AbilityMoment.tsx — [NEEDS WORK] — Split 13 has no special-card abilities; remove or repurpose.
+- ActionBarComponent.tsx — [NEEDS WORK] — Split 13's only action is "throw a card"; simplify drastically.
+- ActionButton.tsx — [NEEDS WORK] — depends on new, much smaller action set.
+- ActionController.tsx — [NEEDS WORK] — depends on new turn-action flow (throw only, no draw/swap/ability choices).
+- ActionControllerView.tsx — [NEEDS WORK] — same, follows ActionController.
+- ActionFactories.tsx — [NEEDS WORK] — action set is entirely different.
+- CheckMoment.tsx — [NEEDS WORK] — Split 13 has no "Call Check"; remove or repurpose.
+- GameBoard.tsx — [NEEDS WORK] — major: needs 4-seat layout with team score piles instead of Check!'s per-player grid layout.
+- GameEventCaption.tsx — [WARNING] — overlay mechanism likely reusable; event text/types need Split 13's vocabulary (capture, throw) instead of Check!'s (match, peek, ability).
+- GameHeader.tsx — [NEEDS WORK] — needs team scores + hand progress instead of Check!'s per-turn-phase info.
+- GameLobby.tsx — [NEEDS WORK] — major: fixed 4 seats mapped to Team A/B, bot-fill, instead of Check!'s 2-6 variable lobby.
+- GameUI.tsx — [NEEDS WORK] — composition root; follows once its children are rebuilt.
+- HandGrid.tsx — [NEEDS WORK] — Check!'s 2x2 grid has no Split 13 equivalent (13-card fanned hand instead); replace.
+- LearnCheckSheet.tsx — [NEEDS WORK] — rewrite content for Split 13 rules, or add a parallel component.
+- MatchMoment.tsx — [NEEDS WORK] — Split 13 has no separate matching-stage window (capture happens on the throw itself); remove or repurpose.
+- PenaltyMoment.tsx — [NEEDS WORK] — Split 13 has no penalty-card mechanic; remove.
+- PlayerHand.tsx — [NEEDS WORK] — major: renders a 4-card face-down grid; Split 13 needs a 13-card, always-face-up-to-owner hand.
+- PlayerHandStrip.tsx — [WARNING] — opponent hand-count strip concept is similar; verify it fits 13-card counts and the 4-seat layout.
+- RoundSummary.tsx — [NEEDS WORK] — Split 13 has no hidden-hand reveal moment; needs a team-score summary instead.
+- TableArea.tsx — [NEEDS WORK] — one capture stack instead of separate draw/discard piles.
+- useGameSounds.ts — [NEEDS WORK] — remove sound events for cut mechanics (peek/ability/match/penalty/check), add one for capture.
+
+## components/layout/
+
+- LoadingOrError.tsx — [COMPLETE]
+- SidePanel.tsx — [WARNING] — log/chat panel likely reusable; log message types need Split 13's event vocabulary.
+
+## components/modals/
+
+- ColdStartWaitNotice.tsx — [COMPLETE]
+- JoinGameModal.tsx — [WARNING] — join-by-code flow likely reusable; verify no leftover max-players UI.
+- NewGameModal.tsx — [NEEDS WORK] — replace max-players picker with Split 13's fixed 4-seat/team picker.
+- RejoinModal.tsx — [COMPLETE] — generic rejoin/join-via-link prompt.
+
+## components/providers/
+
+- CursorProvider.tsx — [COMPLETE]
+- SmoothScrollProvider.tsx — [COMPLETE]
+
+## components/ui/ (shadcn primitives — game-agnostic)
+
+- alert.tsx — [COMPLETE]
+- avatar.tsx — [COMPLETE]
+- badge.tsx — [COMPLETE]
+- BrandMark.tsx — [NEEDS WORK] — rebrand.
+- button.tsx — [COMPLETE]
+- card.tsx — [COMPLETE]
+- CustomCursor.tsx — [COMPLETE]
+- dialog.tsx — [COMPLETE]
+- dropdown-menu.tsx — [COMPLETE]
+- input.tsx — [COMPLETE]
+- label.tsx — [COMPLETE]
+- select.tsx — [COMPLETE]
+- Signature.tsx — [NEEDS WORK] — rebrand (Check!-specific signature/credit mark).
+- sonner.tsx — [COMPLETE]
+- switch.tsx — [COMPLETE]
+- tabs.tsx — [COMPLETE]
+- ThemeToggle.tsx — [COMPLETE]
+- tooltip.tsx — [COMPLETE]
+
+## context/
+
+- DeviceContext.tsx — [COMPLETE]
+- GameUIContext.ts — [WARNING] — hook shapes (`useUIActorRef`/`useUISelector`) are reusable; the state/event types they're generic over come from `uiMachine.ts`, which is being rewritten.
+
+## hooks/
+
+- use-media-query.ts — [COMPLETE]
+
+## lib/
+
+- actors.ts — [NEEDS WORK] — actor factory helpers depend on the current machine's state shape.
+- card-motion.ts — [COMPLETE] — generic animation config.
+- logger.ts — [COMPLETE]
+- site.ts — [NEEDS WORK] — rebrand (site name/urls).
+- socket.ts — [COMPLETE] — generic socket connection, event-agnostic.
+- sounds.ts — [NEEDS WORK] — sound event list needs updating alongside useGameSounds.ts.
+- stampQueue.ts — [COMPLETE] — generic.
+- types.ts — [NEEDS WORK] — depends on new shared-types shapes.
+- utils.ts — [COMPLETE]
+
+## machines/
+
+- uiMachine.ts — [MISSING] — the existing 48KB file is 100% Check!'s state machine (lobby/peek/matching/ability sub-states); Split 13 needs a from-scratch client machine for its much simpler flow (throw → capture check → next turn). Treat as unbuilt, not "needs edits."
+
+## public/
+
+- noise.svg — [COMPLETE]
+- signature.svg — [NEEDS WORK] — rebrand.
+- sounds/ (18 .mp3 files: ability, chat, check, click, deal, draw, join, leave, match, peek, penalty, place, ready, round-over, shuffle, skip, start, swap, timer-tail, unready, your-turn) — [NEEDS WORK] — several map to mechanics Split 13 doesn't have (ability, check, match, peek, penalty, swap); a new "capture" sound is needed (see [[MISSING]] machines/uiMachine.ts and useGameSounds.ts above).
+
+## Planned / not yet created (Split 13-specific)
+
+- Seat/team picker UI (lobby) — [MISSING]
+- Team scoreboard component (live A vs B totals) — [MISSING]
+- Bot/agent indicator in seat UI (shows which seats are bots) — [MISSING]

@@ -1,0 +1,29 @@
+# server — Progress (Split 13 rewrite)
+
+Tracks progress converting this package from Check! to Split 13. Tags reflect how much Split-13-specific work each file needs, not whether the current Check! code works.
+
+Legend: [COMPLETE] no change needed · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
+
+Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
+
+## Top-level config
+
+- .env.example — [COMPLETE] — infra, game-agnostic.
+- package.json — [NEEDS WORK] — name/description still say "Check!"; rename for Split 13.
+- tsconfig.json — [COMPLETE]
+
+## src/
+
+- index.ts — [NEEDS WORK] — Socket.IO server, connection lifecycle and `activeGameMachines` map are reusable transport; the `PLAYER_ACTION` dispatch and per-event payloads reference Check!'s action set (draw/swap/ability/etc.) and need to route to Split 13's much smaller one (throw only) plus bot-turn triggering.
+- game-machine.ts — [MISSING] — the existing 95KB file is Check!'s entire rules engine (draw pile, matching stage, LIFO ability stack, locking, etc.). None of Split 13's rules (deal 13 each, throw, capture-on-rank-match, team scoring) exist yet. Treat as unbuilt, not "needs edits" — this is the core rewrite. See design-vault/Redesign/Split 13 - Game Rules.md for the spec to implement against.
+- state-redactor.ts — [NEEDS WORK] — Check! redacts opponents' hidden hands; Split 13 has no hidden information at all (every player sees their own full 13-card hand at all times, per the design doc), so this file's entire purpose may not be needed — confirm with the user whether any redaction is still required (e.g. hiding other players' hand *contents*, if that's ever added) before deleting it outright.
+- types.ts — [NEEDS WORK] — server-local types will follow whatever shared-types/src/index.ts becomes.
+- lib/deck-utils.ts — [WARNING] — deck-building/shuffling logic is probably reusable (still a standard 52-card deck); verify the dealing function splits into four 13-card hands rather than Check!'s 4-card deals.
+- lib/logger.ts — [COMPLETE]
+- lib/rng.ts — [COMPLETE] — generic seeded RNG, game-agnostic.
+
+## Planned / not yet created (Split 13-specific)
+
+- Bot/agent decision module (server-side AI move logic — see design-vault/Redesign/Split 13 - Game Rules.md §10 for the v1 heuristic) — [MISSING]
+- Team-scoring logic (pool captures per team, live score updates) — [MISSING]
+- Seat-to-team mapping / team assignment during lobby join — [MISSING]
