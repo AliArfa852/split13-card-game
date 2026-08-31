@@ -6,6 +6,7 @@ import {
   type JoinGameResponse,
   type AttemptRejoinResponse,
   type InitialPlayerSetupData,
+  type BotDifficulty,
 } from "shared-types";
 
 // The ack timer starts when the packet is created, not when it is sent, so
@@ -18,7 +19,7 @@ const NO_ANSWER =
 
 export const createGameActor = fromPromise<
   CreateGameResponse,
-  { name: string; maxPlayers?: number }
+  { name: string; botDifficulty?: BotDifficulty }
 >(async ({ input }) => {
   return new Promise((resolve, reject) => {
     socket

@@ -13,29 +13,21 @@ import {
   PlayerActionType,
   SocketEventName,
   GameStage,
-  type ClientAbilityContext,
-  type PlayerId,
-  type ClientCheckGameState,
+  type BotDifficulty,
+  type ClientSplitGameState,
   type CreateGameResponse,
   type JoinGameResponse,
   type ChatMessage,
   type RichGameLogMessage,
-  type Card,
-  type AbilityActionPayload,
-  type PeekTarget,
-  type SwapTarget,
-  TurnPhase,
 } from "shared-types";
 import { toast } from "sonner";
 import logger from "@/lib/logger";
 import { createGameActor, joinGameActor, rejoinActor } from "@/lib/actors";
 
-const PEEK_ABILITY_DURATION_MS = 5000;
 // How long a move may go unanswered before we stop trusting the connection.
 // Every player action ends in a broadcast, so silence this long means the
 // server has stopped talking to us while the socket has not yet noticed.
 const ACTION_ANSWER_TIMEOUT_MS = 8000;
-const INITIAL_PEEK_DURATION_MS = 10000;
 
 // A free-tier server spins down after 15 minutes idle and takes roughly a
 // minute to answer the first request after that. HANDSHAKE_TIMEOUT_MS in
@@ -60,14 +52,9 @@ const COLD_START_HINT_ID = "coldStartHint";
 const COLD_START_EXPLAIN_ID = "coldStartExplain";
 
 type ServerToClientEvents =
-  | { type: "CLIENT_GAME_STATE_UPDATED"; gameState: ClientCheckGameState }
+  | { type: "CLIENT_GAME_STATE_UPDATED"; gameState: ClientSplitGameState }
   | { type: "NEW_GAME_LOG"; logMessage: RichGameLogMessage }
   | { type: "NEW_CHAT_MESSAGE"; chatMessage: ChatMessage }
-  | { type: "INITIAL_PEEK_INFO"; hand: Card[] }
-  | {
-      type: "ABILITY_PEEK_RESULT";
-      results: Array<{ card: Card; playerId: PlayerId; cardIndex: number }>;
-    }
   | { type: "ERROR_RECEIVED"; error: string }
   | { type: "INITIAL_LOGS_RECEIVED"; logs: RichGameLogMessage[] };
 
@@ -84,25 +71,14 @@ export type UIMachineInput = {
   reconnectToken?: string;
 };
 
-export type PeekedCardInfo = {
-  playerId: PlayerId | null;
-  cardIndex: number;
-  card: Card;
-  expireAt?: number;
-  source: "ability" | "initial-peek";
-};
-
 export interface UIMachineContext {
   gameId?: string;
-  currentGameState?: ClientCheckGameState;
+  currentGameState?: ClientSplitGameState;
   localPlayerId?: string;
-  currentAbilityContext?: ClientAbilityContext;
   /** Proves this seat is ours when rejoining. Server-issued, never broadcast. */
   reconnectToken?: string;
-  visibleCards: PeekedCardInfo[];
   isSidePanelOpen: boolean;
   reconnectionAttempts: number;
-  hasPassedMatch: boolean;
   /** serverNow − client Date.now(), from the latest broadcast. Server
    *  timestamps convert to client-clock via `ts - serverClockOffset`. */
   serverClockOffset: number;
@@ -126,24 +102,20 @@ export type UIMachineEvents =
       type: "_SESSION_ESTABLISHED";
       response: CreateGameResponse | JoinGameResponse;
     }
-  | { type: "CREATE_GAME_REQUESTED"; playerName: string; maxPlayers?: number }
+  | {
+      type: "CREATE_GAME_REQUESTED";
+      playerName: string;
+      botDifficulty?: BotDifficulty;
+    }
   | { type: "JOIN_GAME_REQUESTED"; playerName: string; gameId: string }
   | { type: "LEAVE_GAME" }
   | { type: "SUBMIT_CHAT_MESSAGE"; message: string }
-  | {
-      type: "PLAYER_SLOT_CLICKED_FOR_ABILITY";
-      playerId: PlayerId;
-      cardIndex: number;
-    }
   | { type: "ACTION_NOT_SENT" }
   | { type: "ACTION_UNANSWERED" }
   | { type: "_COLD_START_WAKING" }
   | { type: "_COLD_START_EXPLAINING" }
   | { type: "SEAT_CLAIMED_ELSEWHERE" }
-  | { type: "CONFIRM_ABILITY_ACTION" }
-  | { type: "SKIP_ABILITY_STAGE" }
   | { type: "TOGGLE_SIDE_PANEL" }
-  | { type: "CLEANUP_EXPIRED_CARDS" }
   | { type: "DISMISS_MODAL" }
   | { type: "CONNECT"; recovered?: boolean }
   | { type: "RETRY_REJOIN" }
@@ -155,17 +127,13 @@ export type UIMachineEvents =
       type: PlayerActionType.REMOVE_PLAYER;
       payload: { playerIdToRemove: string };
     }
-  | { type: PlayerActionType.DRAW_FROM_DECK }
-  | { type: PlayerActionType.DRAW_FROM_DISCARD }
+  | { type: PlayerActionType.CLAIM_SEAT; payload: { seatIndex: number } }
   | {
-      type: PlayerActionType.SWAP_AND_DISCARD;
-      payload: { handCardIndex: number };
+      type: PlayerActionType.SET_BOT_DIFFICULTY;
+      payload: { difficulty: BotDifficulty };
     }
-  | { type: PlayerActionType.DISCARD_DRAWN_CARD }
-  | { type: PlayerActionType.ATTEMPT_MATCH; payload: { handCardIndex: number } }
-  | { type: PlayerActionType.PASS_ON_MATCH_ATTEMPT }
-  | { type: PlayerActionType.CALL_CHECK }
-  | { type: PlayerActionType.DECLARE_READY_FOR_PEEK }
+  // One card, once per turn. This is the entire in-game move set.
+  | { type: PlayerActionType.THROW_CARD; payload: { cardId: string } }
   | { type: PlayerActionType.PLAY_AGAIN }
   | { type: PlayerActionType.REQUEST_PLAY_AGAIN };
 
@@ -251,23 +219,7 @@ export const uiMachine = setup({
       },
       // "Pass" is final per matching opportunity, so only reset the flag when
       // the incoming state carries a different (or no) matching opportunity.
-      hasPassedMatch: ({ context, event }) => {
-        const nextState =
-          event.type === "CLIENT_GAME_STATE_UPDATED"
-            ? event.gameState
-            : event.type === "_SESSION_ESTABLISHED" &&
-                "gameState" in event.response
-              ? event.response.gameState
-              : undefined;
-        const prev = context.currentGameState?.matchingOpportunity;
-        const next = nextState?.matchingOpportunity;
-        if (!next) return false;
-        const sameOpportunity =
-          !!prev &&
-          prev.startTimestamp === next.startTimestamp &&
-          prev.cardToMatch.id === next.cardToMatch.id;
-        return sameOpportunity ? context.hasPassedMatch : false;
-      },
+
       serverClockOffset: ({ context, event }) => {
         const nextState =
           event.type === "CLIENT_GAME_STATE_UPDATED"
@@ -360,9 +312,8 @@ export const uiMachine = setup({
       gameId: undefined,
       reconnectToken: undefined,
       currentGameState: undefined,
-      currentAbilityContext: undefined,
-      visibleCards: [],
-      reconnectionAttempts: 0,
+
+          reconnectionAttempts: 0,
       pendingActionSince: null,
     }),
     armColdStartPhases: enqueueActions(({ enqueue }) => {
@@ -436,51 +387,13 @@ export const uiMachine = setup({
         payload: { type, ...rest },
       } as const;
     }),
-    emitConfirmAbility: emit(({ context }) => {
-      const ability = context.currentAbilityContext;
-      if (!ability) throw new Error("Ability context missing");
-      const playerId = context.localPlayerId;
-      if (!playerId) throw new Error("Local player ID missing");
 
-      let payload: AbilityActionPayload;
-      if (ability.stage === "peeking") {
-        payload = { action: "peek", targets: ability.selectedPeekTargets };
-      } else {
-        payload = {
-          action: "swap",
-          source: ability.selectedSwapTargets[0]!,
-          target: ability.selectedSwapTargets[1]!,
-          sourceCard: ability.sourceCard,
-        };
-      }
-      return {
-        type: "EMIT_TO_SOCKET",
-        eventName: SocketEventName.PLAYER_ACTION,
-        payload: { type: PlayerActionType.USE_ABILITY, playerId, payload },
-      } as const;
-    }),
     emitLeaveGame: emit(() => ({
       type: "EMIT_TO_SOCKET" as const,
       eventName: SocketEventName.PLAYER_ACTION as const,
       payload: { type: PlayerActionType.LEAVE_GAME },
     })),
-    emitSkipAbilityStage: emit(({ context }) => {
-      const playerId = context.localPlayerId;
-      if (!playerId) throw new Error("Local player ID missing");
-      logger.debug(
-        { action: "skip", playerId },
-        "Emitting skip ability action",
-      );
-      return {
-        type: "EMIT_TO_SOCKET",
-        eventName: SocketEventName.PLAYER_ACTION,
-        payload: {
-          type: PlayerActionType.USE_ABILITY,
-          playerId,
-          payload: { action: "skip" },
-        },
-      } as const;
-    }),
+
     showErrorToast: ({ event }) => {
       assertEvent(event, "ERROR_RECEIVED");
       toast.error(event.error);
@@ -488,204 +401,12 @@ export const uiMachine = setup({
     toggleSidePanel: assign({
       isSidePanelOpen: ({ context }) => !context.isSidePanelOpen,
     }),
-    addPeekedCardToContext: enqueueActions(({ context, event, enqueue }) => {
-      assertEvent(event, "ABILITY_PEEK_RESULT");
-      // A whole peek batch arrives as ONE event, so a single deadline stamp
-      // covers it (the old per-card events needed a find-the-batch dance to
-      // share one expiry, and their separate commits opened flips out of
-      // sync).
-      const batchExpireAt = Date.now() + PEEK_ABILITY_DURATION_MS;
-      const newCards: PeekedCardInfo[] = event.results.map((r) => ({
-        playerId: r.playerId,
-        cardIndex: r.cardIndex,
-        card: r.card,
-        source: "ability",
-        expireAt: batchExpireAt,
-      }));
-      enqueue.assign({
-        visibleCards: [
-          ...context.visibleCards.filter(
-            (c) =>
-              !newCards.some(
-                (n) => n.playerId === c.playerId && n.cardIndex === c.cardIndex,
-              ),
-          ),
-          ...newCards,
-        ],
-      });
-      enqueue.raise(
-        { type: "CLEANUP_EXPIRED_CARDS" },
-        { delay: PEEK_ABILITY_DURATION_MS + 250 },
-      );
-    }),
-    setInitialPeekCards: enqueueActions(({ context, event, enqueue }) => {
-      assertEvent(event, "INITIAL_PEEK_INFO");
-      const localPlayerId = context.localPlayerId;
-      if (!localPlayerId || event.hand.length === 0) {
-        enqueue.assign({ visibleCards: [] });
-        return;
-      }
-      const handSize =
-        context.currentGameState?.players[localPlayerId]?.hand.length ?? 0;
-      const peekDuration = INITIAL_PEEK_DURATION_MS;
-      enqueue.assign({
-        visibleCards: event.hand.map((card, idx) => {
-          const calculatedIndex = handSize
-            ? handSize - event.hand.length + idx
-            : idx;
-          return {
-            playerId: localPlayerId,
-            cardIndex: calculatedIndex,
-            card,
-            source: "initial-peek" as const,
-            expireAt: Date.now() + peekDuration,
-          };
-        }),
-      });
-      enqueue.raise(
-        { type: "CLEANUP_EXPIRED_CARDS" },
-        { delay: peekDuration + 250 },
-      );
-    }),
-    syncAbilityContext: assign({
-      currentAbilityContext: ({ context }) => {
-        const serverAbilityStack = context.currentGameState?.abilityStack ?? [];
-        if (
-          serverAbilityStack.length === 0 ||
-          serverAbilityStack.at(-1)!.playerId !== context.localPlayerId
-        )
-          return undefined;
-        const topServerAbility = serverAbilityStack.at(-1)!;
-        const currentClientAbility = context.currentAbilityContext;
-        if (
-          !currentClientAbility ||
-          // Compare by source card so back-to-back abilities of the same type
-          // (e.g. a matched King pair owned by the same player) don't reuse
-          // the previous ability's selections.
-          currentClientAbility.sourceCard.id !==
-            topServerAbility.sourceCard.id ||
-          currentClientAbility.stage !== topServerAbility.stage ||
-          // Pooled combos take multiple swaps on ONE ability (same sourceCard,
-          // same "swapping" stage). Re-key on remainingSwaps so the swap-target
-          // selection resets between each swap of the combo.
-          currentClientAbility.remainingSwaps !==
-            topServerAbility.remainingSwaps
-        ) {
-          const { type, stage, playerId, sourceCard, remainingPeeks } =
-            topServerAbility;
-          let maxPeekTargets = 0;
-          let maxSwapTargets = 0;
 
-          switch (type) {
-            case "king":
-            case "peek":
-              // Pooled peeks are taken all at once, so the cap is the pooled
-              // total the server ships (2 for a lone King, 4 for 2× King, etc.).
-              maxPeekTargets = remainingPeeks ?? 0;
-              maxSwapTargets = 2;
-              break;
-            case "swap":
-              maxSwapTargets = 2;
-              break;
-          }
 
-          return {
-            type,
-            stage,
-            playerId,
-            sourceCard,
-            maxPeekTargets,
-            maxSwapTargets,
-            remainingSwaps: topServerAbility.remainingSwaps,
-            selectedPeekTargets: [],
-            selectedSwapTargets: [],
-            peekedCards: [],
-          };
-        }
-        return currentClientAbility;
-      },
-    }),
-    setAbilityPeekTarget: enqueueActions(({ context, event, enqueue }) => {
-      assertEvent(event, "PLAYER_SLOT_CLICKED_FOR_ABILITY");
-      const ability = context.currentAbilityContext;
 
-      if (!ability || ability.stage !== "peeking") {
-        return;
-      }
 
-      const { playerId, cardIndex } = event;
-      const { maxPeekTargets, selectedPeekTargets } = ability;
-      const newTarget = { playerId, cardIndex };
-      const isAlreadySelected = selectedPeekTargets.some(
-        (t) => t.playerId === playerId && t.cardIndex === cardIndex,
-      );
 
-      let newSelectedTargets: PeekTarget[];
-      if (isAlreadySelected) {
-        newSelectedTargets = selectedPeekTargets.filter(
-          (t) => !(t.playerId === playerId && t.cardIndex === cardIndex),
-        );
-      } else {
-        newSelectedTargets = [...selectedPeekTargets, newTarget].slice(
-          -maxPeekTargets,
-        );
-      }
-
-      enqueue.assign({
-        currentAbilityContext: {
-          ...ability,
-          selectedPeekTargets: newSelectedTargets,
-        },
-      });
-    }),
-    setAbilitySwapTarget: enqueueActions(({ context, event, enqueue }) => {
-      assertEvent(event, "PLAYER_SLOT_CLICKED_FOR_ABILITY");
-      const ability = context.currentAbilityContext;
-
-      if (!ability || ability.stage !== "swapping") {
-        return;
-      }
-
-      const { selectedSwapTargets } = ability;
-      const newTarget = {
-        playerId: event.playerId,
-        cardIndex: event.cardIndex,
-      };
-      const isAlreadySelected = selectedSwapTargets.some(
-        (t) => t.playerId === event.playerId && t.cardIndex === event.cardIndex,
-      );
-
-      let newSelectedTargets: SwapTarget[];
-      if (isAlreadySelected) {
-        newSelectedTargets = selectedSwapTargets.filter(
-          (t) =>
-            !(t.playerId === event.playerId && t.cardIndex === event.cardIndex),
-        );
-      } else {
-        newSelectedTargets = [...selectedSwapTargets, newTarget].slice(-2);
-      }
-
-      enqueue.assign({
-        currentAbilityContext: {
-          ...ability,
-          selectedSwapTargets: newSelectedTargets,
-        },
-      });
-    }),
     resetReconnectionAttempts: assign({ reconnectionAttempts: 0 }),
-    cleanupExpiredVisibleCards: assign({
-      visibleCards: ({ context }) => {
-        const now = Date.now();
-        const remaining = context.visibleCards.filter(
-          (vc) => !vc.expireAt || vc.expireAt > now,
-        );
-        // Preserve reference identity when nothing expired to avoid
-        // triggering re-renders for a no-op.
-        return remaining.length === context.visibleCards.length
-          ? context.visibleCards
-          : remaining;
-      },
-    }),
     dismissModal: assign({ modal: null }),
     redirectToHome: () => {
       if (typeof window !== "undefined") {
@@ -733,11 +454,6 @@ export const uiMachine = setup({
       ),
     log_ENTER_LOBBY: () =>
       logger.info({ machine: "ui", view: "Lobby" }, "UI state entered Lobby"),
-    log_ENTER_INITIAL_PEEK: () =>
-      logger.info(
-        { machine: "ui", view: "Initial Peek" },
-        "UI state entered Initial Peek",
-      ),
     log_ENTER_GAME_BOARD: () =>
       logger.info(
         { machine: "ui", view: "Game Board" },
@@ -763,18 +479,7 @@ export const uiMachine = setup({
     ),
   },
   guards: {
-    isAbilityActionComplete: ({ context }) => {
-      const ability = context.currentAbilityContext;
-      if (!ability) return false;
-      // Must agree with the confirm button's gate in ActionController: peeking
-      // fewer cards than the ability grants is a valid confirm, so only zero
-      // blocks. Requiring the full count here drops the click silently.
-      if (ability.stage === "peeking")
-        return ability.selectedPeekTargets.length > 0;
-      if (ability.stage === "swapping")
-        return ability.selectedSwapTargets.length === 2;
-      return false;
-    },
+
   },
 }).createMachine({
   id: "ui",
@@ -783,12 +488,9 @@ export const uiMachine = setup({
     gameId: input.gameId,
     reconnectToken: input.reconnectToken,
     currentGameState: undefined,
-    currentAbilityContext: undefined,
-    visibleCards: [],
-    isSidePanelOpen: false,
+      isSidePanelOpen: false,
     reconnectionAttempts: 0,
-    hasPassedMatch: false,
-    serverClockOffset: 0,
+      serverClockOffset: 0,
     lastStateReceivedAt: 0,
     modal: null,
     pendingActionSince: null,
@@ -862,7 +564,7 @@ export const uiMachine = setup({
             src: "createGame",
             input: ({ event }) => {
               assertEvent(event, "CREATE_GAME_REQUESTED");
-              return { name: event.playerName, maxPlayers: event.maxPlayers };
+              return { name: event.playerName, botDifficulty: event.botDifficulty };
             },
             onDone: {
               target: "idle",
@@ -937,19 +639,12 @@ export const uiMachine = setup({
         TOGGLE_SIDE_PANEL: { actions: "toggleSidePanel" },
         CLIENT_GAME_STATE_UPDATED: {
           target: ".routing",
-          actions: ["setCurrentGameState", "syncAbilityContext"],
+          actions: "setCurrentGameState",
         },
         INITIAL_LOGS_RECEIVED: { actions: "setInitialLogs" },
         NEW_GAME_LOG: { actions: "addGameLog" },
         NEW_CHAT_MESSAGE: { actions: "addChatMessage" },
         SUBMIT_CHAT_MESSAGE: { actions: "emitChatMessage" },
-        ABILITY_PEEK_RESULT: {
-          actions: "addPeekedCardToContext",
-          target: ".ability.resolving.viewingPeek",
-        },
-        INITIAL_PEEK_INFO: {
-          actions: "setInitialPeekCards",
-        },
         START_GAME: { actions: ["markActionPending", "emitPlayerAction"] },
         DECLARE_LOBBY_READY: {
           actions: ["markActionPending", "emitPlayerAction"],
@@ -958,37 +653,17 @@ export const uiMachine = setup({
           actions: ["markActionPending", "emitPlayerAction"],
         },
         REMOVE_PLAYER: { actions: ["markActionPending", "emitPlayerAction"] },
-        DRAW_FROM_DECK: { actions: ["markActionPending", "emitPlayerAction"] },
-        DRAW_FROM_DISCARD: {
+        CLAIM_SEAT: { actions: ["markActionPending", "emitPlayerAction"] },
+        SET_BOT_DIFFICULTY: {
           actions: ["markActionPending", "emitPlayerAction"],
         },
-        SWAP_AND_DISCARD: {
-          actions: ["markActionPending", "emitPlayerAction"],
-        },
-        DISCARD_DRAWN_CARD: {
-          actions: ["markActionPending", "emitPlayerAction"],
-        },
-        ATTEMPT_MATCH: { actions: ["markActionPending", "emitPlayerAction"] },
-        PASS_ON_MATCH_ATTEMPT: {
-          actions: [
-            "markActionPending",
-            "emitPlayerAction",
-            assign({ hasPassedMatch: true }),
-          ],
-        },
-        CALL_CHECK: { actions: ["markActionPending", "emitPlayerAction"] },
-        DECLARE_READY_FOR_PEEK: {
-          actions: ["markActionPending", "emitPlayerAction"],
-        },
+        // The whole turn, and the only in-game move there is.
+        THROW_CARD: { actions: ["markActionPending", "emitPlayerAction"] },
         PLAY_AGAIN: { actions: ["markActionPending", "emitPlayerAction"] },
         // Advisory rematch toggle — no markActionPending so it stays snappy and
         // re-toggleable while the server echoes the tally back.
         REQUEST_PLAY_AGAIN: { actions: "emitPlayerAction" },
         DISMISS_MODAL: { actions: "dismissModal" },
-        SKIP_ABILITY_STAGE: {
-          actions: ["markActionPending", "emitSkipAbilityStage"],
-        },
-        CLEANUP_EXPIRED_CARDS: { actions: "cleanupExpiredVisibleCards" },
         DISCONNECT: { target: ".disconnected" },
         // A move nobody answered means the board is dead even though the
         // socket still claims otherwise. Re-run the handshake instead of
@@ -1024,19 +699,9 @@ export const uiMachine = setup({
                 context.currentGameState?.gameStage === GameStage.DEALING,
             },
             {
-              target: "initialPeek",
-              guard: ({ context }) =>
-                context.currentGameState?.gameStage === GameStage.INITIAL_PEEK,
-            },
-            {
               target: "playing",
               guard: ({ context }) =>
                 context.currentGameState?.gameStage === GameStage.PLAYING,
-            },
-            {
-              target: "finalTurns",
-              guard: ({ context }) =>
-                context.currentGameState?.gameStage === GameStage.FINAL_TURNS,
             },
             {
               target: "scoring",
@@ -1069,98 +734,12 @@ export const uiMachine = setup({
             RETRY_REJOIN: { target: "reconnecting" },
           },
         },
-        initialPeek: {
-          entry: ["log_ENTER_INITIAL_PEEK"],
-          tags: ["peeking", "playing"],
-        },
         dealing: {
           tags: ["playing"],
         },
         playing: {
           tags: ["playing"],
           entry: "log_ENTER_GAME_BOARD",
-          always: [
-            {
-              target: "ability",
-              guard: ({ context }) =>
-                !!context.currentAbilityContext?.playerId &&
-                context.currentGameState?.turnPhase === TurnPhase.ABILITY,
-            },
-          ],
-        },
-        finalTurns: {
-          tags: ["playing"],
-          always: [
-            {
-              target: "ability",
-              guard: ({ context }) =>
-                !!context.currentAbilityContext?.playerId &&
-                context.currentGameState?.turnPhase === TurnPhase.ABILITY,
-            },
-          ],
-        },
-        ability: {
-          tags: ["ability", "playing"],
-          initial: "selecting",
-          // Whatever substate we are in, leave the ability flow as soon as the
-          // synced server state no longer has an ability for this player.
-          always: [
-            {
-              target: "#inGame.routing",
-              guard: ({ context }) => !context.currentAbilityContext,
-            },
-          ],
-          on: {
-            CLIENT_GAME_STATE_UPDATED: {
-              actions: [
-                assign({ hasPassedMatch: false }),
-                "setCurrentGameState",
-                "syncAbilityContext",
-              ],
-            },
-            PLAYER_SLOT_CLICKED_FOR_ABILITY: [
-              {
-                actions: "setAbilityPeekTarget",
-                guard: ({ context }) =>
-                  context.currentAbilityContext?.stage === "peeking",
-                reenter: true,
-              },
-              {
-                actions: "setAbilitySwapTarget",
-                guard: ({ context }) =>
-                  context.currentAbilityContext?.stage === "swapping",
-              },
-            ],
-            CONFIRM_ABILITY_ACTION: {
-              guard: "isAbilityActionComplete",
-              actions: ["markActionPending", "emitConfirmAbility"],
-              target: ".resolving",
-            },
-            SKIP_ABILITY_STAGE: {
-              actions: ["markActionPending", "emitSkipAbilityStage"],
-            },
-          },
-          states: {
-            selecting: {
-              tags: ["ability-selecting"],
-            },
-            resolving: {
-              initial: "waiting",
-              states: {
-                waiting: {},
-                // The server owns the peek→swap transition (its own 5s timer
-                // or an explicit skip). The client only waits here until the
-                // synced ability context leaves the peeking stage.
-                viewingPeek: {
-                  always: {
-                    guard: ({ context }) =>
-                      context.currentAbilityContext?.stage !== "peeking",
-                    target: "#inGame.ability.selecting",
-                  },
-                },
-              },
-            },
-          },
         },
         scoring: { entry: "log_ENTER_SCORING", tags: ["scoring", "playing"] },
         gameover: {
@@ -1220,9 +799,7 @@ export const uiMachine = setup({
                       event.output.gameState?.serverNow,
                     ),
                   reconnectionAttempts: 0,
-                  hasPassedMatch: false,
-                }),
-                "syncAbilityContext",
+                                }),
                 enqueueActions(({ event, enqueue }) => {
                   if (event.output.logs && event.output.logs.length > 0) {
                     enqueue.raise({
@@ -1311,7 +888,7 @@ export const uiMachine = setup({
           // then completes the session and routes.
           on: {
             CLIENT_GAME_STATE_UPDATED: {
-              actions: ["setCurrentGameState", "syncAbilityContext"],
+              actions: "setCurrentGameState",
             },
           },
           invoke: {

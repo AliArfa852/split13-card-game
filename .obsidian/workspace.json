@@ -1,0 +1,208 @@
+{
+  "main": {
+    "id": "a194b0c80076d625",
+    "type": "split",
+    "children": [
+      {
+        "id": "010226cc14382a56",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9f09cdaf5c6dfba4",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "no-unresolved"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "955b8f7deaf5b491",
+    "type": "split",
+    "children": [
+      {
+        "id": "0ab7aeacae69d9f1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "615fa513998f5b63",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "7d5e3d2f151ce602",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "2b9b64f63b7bd625",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "a25107f40356ab1b",
+    "type": "split",
+    "children": [
+      {
+        "id": "95b2d02896a2e1d8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "79de5dcf0c677509",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "9af0bfecc8b872b4",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "32d2969e94f6ff63",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "3a6a28f9ea6e2dd2",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "e93692f5242e50b0",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ],
+        "currentTab": 3
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "615fa513998f5b63",
+  "lastOpenFiles": [
+    "currenttask.md",
+    "client/tsconfig.tsbuildinfo",
+    "server/tsconfig.tsbuildinfo",
+    "server/dist/index.d.ts",
+    "server/dist/index.js",
+    "server/dist/index.js.map",
+    "server/dist/state-redactor.d.ts",
+    "server/dist/state-redactor.js",
+    "server/dist/state-redactor.js.map",
+    "server/dist/game-machine.d.ts",
+    "server/dist/game-machine.js",
+    "node_modules/eslint-module-utils/node_modules/debug/CHANGELOG.md",
+    "node_modules/@typescript-eslint/scope-manager/README.md",
+    "node_modules/lightningcss-linux-x64-gnu/README.md"
+  ]
+}

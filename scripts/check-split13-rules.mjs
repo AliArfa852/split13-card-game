@@ -8,8 +8,15 @@
  * Needs a built server: npm run build:server-deps
  * Run: npm run check:rules
  */
-import { createActor } from "xstate";
-import {
+// Set before the machine module is loaded: it reads its delays from env at
+// import time, and at the real 20s/1.1s pacing a single hand takes a minute.
+// Dynamic imports below are what make this ordering possible.
+process.env.TURN_TIMER_MS ??= "300";
+process.env.BOT_THINK_MS ??= "1";
+process.env.LOG_LEVEL ??= "silent";
+
+const { createActor } = await import("xstate");
+const {
   BotDifficulty,
   CardRank,
   FULL_DECK_POINTS,
@@ -18,9 +25,13 @@ import {
   SEAT_COUNT,
   Suit,
   Team,
-} from "shared-types";
-import { gameMachine, finishHand } from "../server/dist/game-machine.js";
-import { generatePlayerView } from "../server/dist/state-redactor.js";
+} = await import("shared-types");
+const { gameMachine, finishHand } = await import(
+  "../server/dist/game-machine.js"
+);
+const { generatePlayerView } = await import(
+  "../server/dist/state-redactor.js"
+);
 
 const HUMAN_ID = "human_1";
 const HANDS_TO_SWEEP = 30;
