@@ -1,24 +1,32 @@
-# Check!
+# Split 13
 
 [![CI](https://github.com/vroslmend/check-the-card-game-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/vroslmend/check-the-card-game-v2/actions/workflows/ci.yml)
 
-A browser card game for two to six players, built with Next.js, Socket.IO and XState.
+A browser card game for four players in two teams, built with Next.js, Socket.IO and XState.
 
-_[Play](https://check-the-game.vercel.app)_ · _[Rules](https://check-the-game.vercel.app/rules)_ · _[Architecture](docs/ARCHITECTURE.md)_ · _[Contributing](CONTRIBUTING.md)_
-
-![Check!](docs/social-card.png)
+_[Rules](docs/GAME_RULES.md)_ · _[Architecture](docs/ARCHITECTURE.md)_ · _[Contributing](CONTRIBUTING.md)_
 
 ## The game
 
-You are dealt four cards face down and get one look at two of them. Lowest hand wins, and Aces are worth minus one.
+The deck is split thirteen cards each between four players, seated as two
+teams of two. You always see your own hand.
 
-On your turn you draw, then either swap the card into a hand you half remember or throw it away. Every discard opens a window: anyone holding the same rank can throw their own card away and shrink their hand. Get it wrong and you take a penalty card. Reach eight cards and you are out for the round.
+On your turn you throw one card onto the table stack. If its rank matches the
+card on top, you take the whole stack — every card that has piled up since the
+last capture — and it scores for your team. If it does not match, your card
+becomes the new top for the next player to try, and the pile gets bigger.
 
-Kings, Queens and Jacks do something extra when discarded, letting you look at a card or swap one with another player.
+Aces are worth 20, tens and the picture cards 10, everything else 5. So the
+stack is a pot that grows, and every throw is a bet on whether you or the
+player after you takes it.
 
-Call Check when you think you are lowest. Everyone else gets one more turn, then hands are revealed.
+Turns are clocked at 20 seconds. When the cards run out the higher team total
+wins; whatever is still on the table scores for nobody.
 
-Play at [check-the-game.vercel.app](https://check-the-game.vercel.app)
+Any seat nobody takes is filled by a bot, so one player and three bots is a
+real game.
+
+Full rules: [docs/GAME_RULES.md](docs/GAME_RULES.md)
 
 ## Running locally
 
@@ -27,9 +35,13 @@ npm ci
 npm run dev
 ```
 
+That builds the shared types and the server, then runs the Next.js client and
+the Socket.IO server together. You need both: the server is authoritative for
+every rule in the game.
+
 Client on `localhost:3000`, server on `localhost:8000`. Copy the `.env.example` files in `client/` and `server/` if you want to change ports, timers or table size.
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before filing an issue or opening a pull request. It covers how work is tracked here, what an issue has to end with, and what to run before you push. Open work is in [issues](https://github.com/vroslmend/check-the-card-game-v2/issues).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before filing an issue or opening a pull request.
 
 ## Licence
 

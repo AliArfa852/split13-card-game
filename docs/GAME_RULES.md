@@ -1,188 +1,110 @@
-# Check! Game Rules
+# Split 13 — Game Rules
 
-## 1. Introduction
+This document is the complete rules, and the specification the server
+implements. If the game disagrees with this document, one of the two is a bug.
 
-Check! is a card game for two to six players. You hold four cards face down, you see two of them at the start, and you win by holding the lowest total when the round ends. The difficulty is that your hand changes while you are only half sure what is in it.
+The same text is kept as a note in `design-vault/Redesign/` for working on the
+design; this copy is the one the code answers to.
 
-This document is the complete rules. The server implements what is written here, so if the game disagrees with this document, one of the two is a bug.
+Split 13 is a four-player, two-versus-two capture game. Every player always sees their own full hand, so nothing here rests on memory: the tension is about when to risk adding value to a stack somebody else might take.
 
-## 2. Game Objective
+One thing is still open: whether bot difficulty should be settable per seat rather than once per room. See `design-vault/Redesign/Open Questions.md`.
 
-Be the player with the **lowest total card value** in your hand at the end of the round.
+## 1. Objective
 
-## 3. Game Components
+Split the deck 13 cards each between 4 players, seated as two teams of two (Team A, Team B). Capture cards off the shared table stack by matching its top card. Whichever team has captured more total points once every card has been thrown wins the hand — a tie is a draw.
 
-- **The Draw Pile:** A face-down pile of cards from which players draw.
-- **The Discard Pile:** A face-up pile where cards are discarded. The top card is always visible.
-- **Player Hand (Grid):** Each player has a personal set of cards, initially four, arranged face-down in a 2x2 grid.
+## 2. Players, Teams & Seats
 
-## 4. The Deck & Card Values
+Split 13 is fixed at **exactly 4 seats** — unlike Check!'s 2–6, there's no smaller or larger table.
 
-A standard 52-card deck (no Jokers) is used. Cards are scored as follows:
+- 1–4 humans can join a room; any seat left empty when the host starts is filled by a bot/agent player, so the table always plays full:
+  - 1 human → 3 bots
+  - 2 humans → 2 bots
+  - 3 humans → 1 bot
+  - 4 humans → 0 bots
+- Seats are fixed to teams around the table: **Seat 1 & Seat 3 = Team A, Seat 2 & Seat 4 = Team B.**
+- Players pick their own seat in the lobby (same room-joining mechanics as Check!) — whichever seat you take decides your team.
+- **Teams are locked once the room starts.** Seats (and therefore teams) can only be chosen or changed while still in the lobby, before the host starts the game. Once play begins, no reassigning seats or swapping teams for the life of the room. A bot takes whatever seat is still open at start.
 
-- **Ace (A):** -1 point
-- **Number Cards (2-10):** Face value (e.g., '7' is 7 points)
-- **Jack (J):** 11 points
-- **Queen (Q):** 12 points
-- **King (K):** 13 points
+## 3. The Deck & Card Values
 
-## 5. Game Setup
+Standard 52-card deck, no jokers.
 
-1.  **Joining a Game:** Players join a game lobby before it begins.
-2.  **Starting the Game:** The Game Master initiates the start of the game. _The moment the game starts, the lobby is locked, and no new players may join._
-3.  **Dealing:** The deck is shuffled. Each player is dealt four cards, placed face-down in a 2x2 grid. These cards form the player's starting hand.
-4.  **Initial Peek Phase:** After cards are dealt, each player is allowed to secretly look at their **bottom two cards** only (the cards in the second row of their 2x2 grid). After this phase, all cards are turned face-down again.
+| Rank                  | Points  |
+| --------------------- | ------- |
+| Ace                   | 20      |
+| 2–9                   | 5 each  |
+| 10, Jack, Queen, King | 10 each |
 
-## 6. The Turn - A Player's Actions
+Sanity check on the numbers: the full deck is worth exactly **400 points** (4×20 + 32×5 + 16×10). Nothing enforces an even split — a hand can end lopsided, or exactly tied (see §10).
 
-Turns proceed sequentially around the table. A player's turn consists of one mandatory **Draw Action**, which is then followed by a discard. This discard triggers the **Matching Stage**.
+## 4. Setup & Dealing
 
-#### A. The Draw Action
+1. Shuffle the full 52-card deck.
+2. Deal all of it: **13 cards to each of the 4 players**, nothing held back and nothing dealt face-up.
+3. Each player only ever sees their own hand. Hands may be **sorted for display** (by rank/suit) — a client-side convenience with no effect on dealing, turn order, or what anyone else can see.
+4. The table (capture stack) starts empty.
 
-The current player **must** perform one of the following two actions:
+## 5. Turn Order & Timer
 
-**Action 1: Draw from the Draw Pile**
+- The starting seat for the hand is chosen **randomly** among the 4.
+- From there, turns go **clockwise**: seat 1 → 2 → 3 → 4 → 1 → … Because seats alternate team by construction (§2), this automatically produces the A → B → A → B pattern, cycling each team's two partners in turn (e.g. A1, B1, A2, B2, A1, …).
+- Each player throws exactly **one card per turn** — no exceptions.
+- **Every turn has a 20-second timer**, shown live to all players (not just the active player). If the current player hasn't thrown when it expires, the server **automatically throws a random card** from their hand on their behalf. That throw is a real move — if the random card happens to match the top of the stack, it captures normally, exactly as if the player had chosen it.
+- The hand runs for exactly 13 full circuits of the table (52 throws total — every card in the deck gets thrown exactly once over the course of the hand).
 
-1.  Take the top card from the face-down Draw Pile. This card is visible only to the drawing player.
-2.  The player now has two choices:
-    - **Option A: Swap & Discard.** The player selects one card from their hand and places the newly drawn card face-down in its position. The card that was originally in that position is then placed face-up on top of the Discard Pile.
-    - **Option B: Discard Drawn Card.** The player immediately places the newly drawn card face-up on top of the Discard Pile. This does not alter the player's hand.
+## 6. The Turn — Throwing a Card
 
-**Action 2: Draw from the Discard Pile**
+On your turn, throw exactly one card from your hand face-up onto the table stack.
 
-1.  This action is only possible if the Discard Pile is **not sealed** (see Section 7) and the top card is **not a locked (matched) card** (see Section 7, Successful Match).
-2.  A player **cannot** draw a special card (King, Queen, or Jack) from the Discard Pile.
-3.  If the top card is drawable, the player takes it. They **must** then swap this card with one card from their hand, placing the discard pile card face-down in their grid. The card from their hand is then placed face-up on the Discard Pile.
+- **If the table is empty** (the very first throw of the hand, or the throw right after a capture), your card simply becomes the stack. No capture is possible on this throw.
+- **Otherwise**, compare your card's **rank** to the rank of the current top card of the stack (same rank, any suit — a 7 matches any 7):
+  - **Match** → you capture. See §7.
+  - **No match** → your card is added on top of the stack; it becomes the new top card for whoever's turn is next. Turn passes to the next seat.
 
-**Note on special cards.** If a King, Queen, or Jack is drawn from the deck and swapped into a player's hand, its ability does not trigger at that moment. An ability only triggers when a special card is **discarded** from a player's hand onto the Discard Pile.
+## 7. Capturing the Stack
 
-#### B. End of Turn
+If your card's rank matches the top card's rank:
 
-After a player discards a card (completing their Draw Action), the game enters **The Matching Stage**. Once the Matching Stage and any resulting Special Abilities are fully resolved, the turn passes to the next player.
+1. Your card joins the stack.
+2. You immediately capture the **entire stack** — every card that has piled up since the last capture (or since the start of the hand, if there hasn't been one yet).
+3. All of it goes to **your team's** score pile (§8) — captures are shared with your partner, not kept individually.
+4. The table is now **completely empty** — no leftover card of any kind. Your turn ends the moment you capture; you don't get a second throw. Play passes to the next seat as normal.
 
-#### C. Turn Timer
+## 8. Scoring
 
-Each decision window is time-limited (default: 45 seconds) so a single player cannot stall the game:
+- Scoring is **per team**, not per player: Team A's score is every point captured by either A1 or A2, combined. Same for Team B.
+- The point value of a captured card is the table in §3, and every card in a captured stack counts, not just the one that triggered the capture.
+- Scores update **live** — both teams see the total change the instant a capture happens, not just at the end of the hand.
+- Because a captured card leaves the table permanently, each of the 52 cards can contribute to a team's score **at most once** per hand.
 
-- **Draw window:** if the player has not acted when time expires, they automatically draw from the Draw Pile.
-- **Discard window:** an unresolved deck draw is automatically discarded; a discard-pile draw is automatically swapped with the first card in the player's grid.
-- **Ability window:** an unresolved Special Ability fizzles (see Section 11.C).
-- **Initial Peek:** if a player never declares Ready, the peek phase begins anyway once the timer expires.
+## 9. Live Information
 
-## 7. The Matching Stage
+All players can see, at all times, live:
 
-This is a timed, real-time event that occurs immediately after _any_ card is discarded.
+- The **turn timer** counting down for whoever's turn it currently is (§5).
+- **Both teams' running scores** (§8).
+- The **total point value currently sitting in the table stack** — i.e. what a capture right now would be worth. This is deliberate: it's what lets everyone weigh the risk of adding a high-value card to a stack they might not be the one to capture, which is the core tension of this game (see Core Tension).
 
-- **Trigger:** A card being placed face-up on the Discard Pile.
-- **Objective:** To discard a card of the **exact same rank** from your hand onto the newly discarded card.
-- **Participants:** Any player who is **not locked**, including the player who just discarded the card.
+## 10. End of the Hand & Winning
 
-#### Mechanics of Matching
+- The hand ends the instant all 4 players have thrown all 13 of their cards.
+- Whatever is still sitting on the table at that point was thrown but never matched by anyone — it is **discarded, worth zero points to either team.**
+- Compare Team A's total to Team B's:
+  - **Higher total wins the hand.** In this v1 (single-hand mode), winning the hand wins the game.
+  - **Equal totals is a draw.** No sudden-death, no shared win — the hand simply ends in a draw.
 
-1.  **Timer:** A short timer (e.g., 5 seconds) begins the moment the opportunity starts.
-2.  **Attempting a Match:** Any eligible player can select a card from their hand and play it to attempt a match.
-3.  **Passing:** Any eligible player can choose to **Pass**. _The decision to Pass is final for that specific matching opportunity._ The player cannot attempt a match after passing.
-4.  **Ending the Stage:** The Matching Stage ends as soon as one of the following occurs:
-    - A player makes a **successful match**.
-    - All eligible players have manually **passed**.
-    - The **timer expires**. (This counts as a "Pass" for any player who has not acted).
+## 11. Bots
 
-#### Outcomes of Matching
+Three difficulty tiers, chosen as a **room setting** by the host before starting (applies to every bot seat in that room):
 
-- **Successful Match:**
+- **Easy** — plays a uniformly random legal card from its hand each turn. It doesn't seek out matches on purpose; if the random card happens to match the top of the stack, it still captures (the rules apply the same to everyone), but it never plays _for_ that outcome.
+- **Normal** (the original v1 default) — if it holds a card matching the current top of the stack, it plays one and captures. Otherwise, it throws its lowest point-value card, to minimize the value it's risking in a stack it isn't taking.
+- **Hard** — same capture-when-possible rule as Normal, but tracks which ranks have already been fully used (all 4 copies thrown or captured) to identify cards in its hand that can _never_ be matched by anyone again, and throws those first when it has no match — keeping cards with live matching potential in hand for a later capture instead of dumping them early.
 
-  1.  The first player to play a card of the correct rank succeeds.
-  2.  The matching card is removed from their hand and placed on the Discard Pile. Their hand size is reduced by one, and the card's grid slot stays empty (see **The Hand Grid & Empty Slots** below).
-  3.  The Discard Pile is now considered **"sealed."** A sealed pile cannot be drawn from. It remains sealed until the start of the next player's turn or until another action unseals it.
-  4.  If the matched pair consists of two Special Cards (e.g., a King on a King), this triggers a LIFO ability stack (see Section 8.B).
-  5.  If a player's hand becomes empty as a result of a successful match, they have automatically **Called "Check"** (see Section 9.B).
-  6.  **Matched cards are locked for the round.** Both the card that was matched and the card
-      played on top of it become **locked**: they can never be drawn from the Discard Pile by any
-      player for the rest of the round, even after the pile is unsealed. (The "sealed" state in
-      point 3 blocks _any_ draw for the brief window after a match; the permanent lock keeps the
-      matched cards themselves undrawable forever.)
+This is one setting per room for v1, not per individual bot seat — see Open Questions.
 
-- **Failed Match (Penalty):**
-  1.  If a player attempts to match with a card of the wrong rank, the attempt fails.
-  2.  **Penalty:** The player must immediately **draw one card** from the Draw Pile and add it to their hand. The invalid card returns to their hand.
-  3.  The matching opportunity then **continues** for all other eligible players until the stage ends. The penalized player may attempt to match again if they have another valid card.
-  4.  **Penalty Limit (Disqualification):** If a penalty card brings a player's hand to **eight cards**, that player is **disqualified** from the round. They are immediately **locked** (see Section 9.D): they take no further turns, cannot match, and their pending abilities fizzle. Their hand is still revealed and scored at the end of the round, but a disqualified player **cannot win**. If disqualifications leave fewer than two active players and no "Check" is in progress, the round ends immediately and proceeds to Scoring.
+## 12. Still Open
 
-#### The Hand Grid & Empty Slots
-
-A player's cards occupy fixed positions in a two-row grid, and those positions are part of the game's memory challenge:
-
-1.  When a card is **matched** away, its grid slot stays **empty** for the rest of the round. No other card moves.
-2.  A **penalty card** fills the earliest empty slot in the player's grid if one exists; otherwise it is added to the grid as a new slot.
-3.  When both slots of a vertical **column** become empty, that column closes up and the columns to its right shift one step left. Cards never change rows. This is the only time the grid rearranges itself.
-4.  Apart from that single case, nothing ever moves a card between slots except the **swap** of a Special Card ability (Section 8). Empty slots cannot be targeted, swapped into, or chosen when placing a drawn card.
-
-## 8. Special Card Abilities
-
-Abilities are triggered when a Special Card (King, Queen, or Jack) is discarded to the top of the Discard Pile. This can happen during a player's normal turn or as part of a successful match. The game enters an "Ability Resolution" phase to handle them.
-
-- **King (K):** Peek at any **two** cards on the table (your own or an opponent's). Then, swap any **one** card on the table with any **other** card.
-- **Queen (Q):** Peek at any **one** card on the table. Then, swap any **one** card with any **other** card.
-- **Jack (J):** Swap any **one** card with any **other** card. (No peek).
-
-The peek counts above are maximums, not requirements. You may peek at fewer cards than an ability allows and confirm, which matters when matched Special Cards pool their peeks (Section 8.B) and the table holds fewer cards than the pool. Peeking nothing at all is a skip (Section 8.A).
-
-**Note on peek visibility.** As at a real table, all players can see which card positions are being peeked at, but only the peeking player sees the card's face. Similarly, a card taken from the Discard Pile stays face-up for everyone while it is held, since it was already public knowledge.
-
-#### A. Skipping Abilities
-
-A player may choose to skip parts of their ability. For a King or Queen, they can skip the "peek" stage and proceed to the "swap" stage. They can also skip the "swap" stage, which ends the ability's effect.
-
-#### B. LIFO Stack Resolution (For Matched Special Cards)
-
-When one Special Card is matched on top of another, two abilities are triggered and placed on a stack. They resolve in **Last-In, First-Out (LIFO)** order.
-
-- **Example:** Alice discards a King. Bob successfully matches it with his own King.
-  1.  Alice's King ability is triggered and placed on the stack first.
-  2.  Bob's King ability is triggered and placed on top of Alice's.
-  3.  **Bob resolves his ability first.**
-  4.  After Bob's ability is finished, **Alice resolves her ability.**
-
-## 9. Calling "Check" & Ending the Round
-
-#### A. Player-Initiated "Check"
-
-On their turn, if no other actions are pending and the Final Turns phase has not yet begun, a player may choose to **"Call Check."**
-
-- This player is now the official **Check-caller**.
-- Their turn immediately ends.
-- They become **locked**. A locked player takes no more actions for the rest of the round.
-- The game enters the **Final Turns Phase**.
-
-#### B. Automatic "Check" (Empty Hand)
-
-If a player successfully makes a match that causes their hand to become empty, they automatically "Call Check."
-
-- They immediately become **locked**.
-- If this is the first "Check" of the round, they become the official Check-caller, and the game enters the **Final Turns Phase**.
-
-#### C. The Final Turns Phase
-
-Once "Check" has been called, every other eligible player gets to take **one last turn.**
-
-- The Check-caller is locked and does not get a final turn.
-- **Turn order in this phase** follows the normal clockwise seating, continuing from the seat that would have played next, meaning the player after whoever's turn was in progress when Check was called, and wraps around the table until every eligible player has taken exactly one final turn. When Check is triggered automatically by an out-of-turn match (§9.B), this means play continues from where it actually was at the table, **not** from the checker's seat.
-- During a final turn, all standard gameplay rules apply, including the **Matching Stage** (Section 7) and **Special Card Abilities** (Section 8).
-- Players cannot manually "Call Check" during this phase.
-
-#### D. Locked Player State
-
-Once any player is locked (either by calling "Check" or emptying their hand), their hand cards **cannot be targeted** by opponents' Special Card abilities.
-
-## 10. Scoring & Winning
-
-1.  After the Final Turns Phase is complete, the round ends and all players reveal their hands.
-2.  Scores are calculated based on the card values in Section 4.
-3.  The player or players with the **lowest total score** win(s) the round. In the event of a tie, all tied players are considered winners.
-4.  Scores do not carry between rounds. The host can start another round in the same lobby, and other players can signal that they want one. The lobby keeps a running count of rounds won for as long as it lasts, with no fixed number of rounds and no target score.
-
-## 11. Appendix: Edge Cases & Special Rulings
-
-- **A. Empty Draw Pile:** If the Draw Pile becomes empty and a player needs to draw a card, the Discard Pile is immediately repurposed. The current top card of the Discard Pile is left in place, and all cards underneath it are shuffled to become the new face-down Draw Pile.
-- **B. Impossible Draw:** In the rare event that a player is required to draw a card (e.g., for a penalty) and no cards are available in either the Draw Pile or the Discard Pile to be reshuffled, the game ends immediately. All players proceed to the Scoring Phase with their current hands.
-- **C. Ability Fizzling:** If a player's turn to resolve a Special Ability comes up but they are locked (e.g., from a LIFO stack interaction), their ability does not trigger. It "fizzles" and is removed from the stack with no effect.
+Whether bot difficulty should eventually be settable per seat rather than once per room. Tracked in `design-vault/Redesign/Open Questions.md`.

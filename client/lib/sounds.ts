@@ -3,30 +3,23 @@
 // files decode to silent no-ops so a partial asset set never breaks play.
 //
 // Assets: Kenney "Casino Audio" (CC0, kenney.nl/assets/casino-audio),
-// transcoded to mp3 — see round-12-plan-execution.md R12.3 for the manifest.
+// transcoded to mp3. Only the sounds Split 13 can actually make are listed:
+// the set Check! needed for peeks, abilities, penalties and matching went
+// with those mechanics.
 const SPRITES = {
   deal: "/sounds/deal.mp3",
-  draw: "/sounds/draw.mp3",
   place: "/sounds/place.mp3",
-  peek: "/sounds/peek.mp3",
-  match: "/sounds/match.mp3",
-  capture: "/sounds/match.mp3",
-  penalty: "/sounds/penalty.mp3",
-  check: "/sounds/check.mp3",
+  capture: "/sounds/capture.mp3",
   yourTurn: "/sounds/your-turn.mp3",
   timerTail: "/sounds/timer-tail.mp3",
   roundOver: "/sounds/round-over.mp3",
   chat: "/sounds/chat.mp3",
-  shuffle: "/sounds/shuffle.mp3",
   click: "/sounds/click.mp3",
-  swap: "/sounds/swap.mp3",
-  ability: "/sounds/ability.mp3",
   join: "/sounds/join.mp3",
   leave: "/sounds/leave.mp3",
   ready: "/sounds/ready.mp3",
   unready: "/sounds/unready.mp3",
   start: "/sounds/start.mp3",
-  skip: "/sounds/skip.mp3",
 } as const;
 export type SpriteName = keyof typeof SPRITES;
 

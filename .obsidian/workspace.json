@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+                "file": "CONTRIBUTING.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "no-unresolved"
+              "title": "CONTRIBUTING"
             }
           }
         ]
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+                "file": "CONTRIBUTING.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -118,7 +118,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+                "file": "CONTRIBUTING.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -161,7 +161,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+                "file": "CONTRIBUTING.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -188,20 +188,21 @@
       "bases:Create new base": false
     }
   },
-  "active": "615fa513998f5b63",
+  "active": "9f09cdaf5c6dfba4",
   "lastOpenFiles": [
-    "client/components/game/sedwBf2gl",
-    "client/components/game/PlayerSeat.tsx",
-    "client/components/game/TeamScoreboard.tsx",
-    "client/components/game/TurnTimer.tsx",
-    "currenttask.md",
-    "client/tsconfig.tsbuildinfo",
     "server/tsconfig.tsbuildinfo",
     "server/dist/index.d.ts",
     "server/dist/index.js",
     "server/dist/index.js.map",
     "server/dist/state-redactor.d.ts",
     "server/dist/state-redactor.js",
+    "server/dist/state-redactor.js.map",
+    "server/dist/game-machine.d.ts",
+    "server/dist/game-machine.js",
+    "server/dist/game-machine.js.map",
+    "server/dist/types.d.ts",
+    "node_modules/eslint-plugin-import/docs/rules/no-unresolved.md",
+    "currenttask.md",
     "node_modules/eslint-module-utils/node_modules/debug/CHANGELOG.md",
     "node_modules/@typescript-eslint/scope-manager/README.md",
     "node_modules/lightningcss-linux-x64-gnu/README.md"

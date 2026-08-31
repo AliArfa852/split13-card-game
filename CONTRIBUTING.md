@@ -1,6 +1,6 @@
-# Contributing to Check!
+# Contributing to Split 13
 
-Thanks for taking an interest. Check! is a personal project and the source is public so people can read it, learn from it and help make it better. Bug reports and ideas are as useful to me as code.
+Thanks for taking an interest. Split 13 is a personal project and the source is public so people can read it, learn from it and help make it better. Bug reports and ideas are as useful to me as code.
 
 Before you send code, read the [Contributor License Agreement](#contributor-license-agreement) at the end of this file. This project is not open source in the usual sense, and submitting a contribution places it under that agreement.
 
@@ -65,7 +65,7 @@ The client hot reloads. The server does not: it runs from a build, so after chan
 
 ## Verifying your change
 
-There is no unit or state machine suite yet, tracked in [#36](https://github.com/vroslmend/check-the-card-game-v2/issues/36), so rules verification is manual and the burden sits with the pull request. Layout is covered, see below.
+Rules are covered: `npm run check:rules` drives whole hands through the real machine and asserts what `docs/GAME_RULES.md` promises. Run it if you touch anything the rules depend on.
 
 Everything CI runs has to pass, and you can run all of it locally first:
 
@@ -105,7 +105,7 @@ It is not part of `npm run verify` or CI, because it needs a browser and takes m
 - **Do not add `paths-ignore` to `.github/workflows/ci.yml`.** CI is a required check, and a workflow skipped by path filtering leaves that check pending forever, which blocks the pull request from merging with no obvious cause. Use a job level `if:` instead, since a skipped job reports success.
 - **`main` is protected by a repository ruleset, not classic branch protection.** `gh api repos/OWNER/REPO/branches/main/protection` returns 404 even though main is fully protected. Use `gh api repos/OWNER/REPO/rulesets`.
 - **A pull request preview cannot test a server change.** Vercel builds the client only, and that preview talks to a server that is already running rather than one built from your branch. A branch that adds a field to the broadcast will show a preview client reading it as missing, because the server sending that broadcast does not have it yet, and it looks exactly like a bug in your client code. Client changes are testable on a preview; server changes are testable locally against both halves, or on production once merged.
-- **If you touch `server/src/state-redactor.ts`, be careful.** That function is the boundary that keeps hidden cards hidden, and it has leaked a player's own hand once before. No face-down card's rank or suit should reach any client outside SCORING and GAMEOVER, including the card's owner. `docs/GAME_RULES.md` defines what each player is allowed to know.
+- **If you touch `server/src/state-redactor.ts`, be careful.** It is the boundary that keeps one player's hand out of another player's client. Almost everything else in Split 13 is public by design — your own cards, the whole table stack, both scores — which is exactly why the one secret is easy to leak by accident. If you add anything private, it has to be redacted there.
 
 ## Opening a pull request
 
@@ -125,7 +125,7 @@ The server is authoritative and redacts hidden cards before broadcasting state, 
 
 ## Contributor License Agreement
 
-**In short, and not as a substitute for the terms below:** Check! is all rights reserved. If you contribute, you keep the copyright in what you wrote and you keep your credit in the git history, but you give me an unrestricted, permanent right to use, change, ship and sell it as part of this project, including under a commercial license. If you are not comfortable with that, please contribute bug reports and ideas instead of code.
+**In short, and not as a substitute for the terms below:** Split 13 is all rights reserved. If you contribute, you keep the copyright in what you wrote and you keep your credit in the git history, but you give me an unrestricted, permanent right to use, change, ship and sell it as part of this project, including under a commercial license. If you are not comfortable with that, please contribute bug reports and ideas instead of code.
 
 The following terms are adapted from the Apache Software Foundation Individual Contributor License Agreement, V2.2.
 

@@ -24,8 +24,8 @@
   },
   "scripts": {
     "build": "npm run build -w shared-types && concurrently -n server,client \"npm run build -w server\" \"npm run build -w client\"",
-    "build:server-deps": "npm run build:shared && npm run build:server",
-    "build:server": "npm run build -w server",
+    "build:server-deps": "npm run build:server",
+    "build:server": "npm run build:shared && npm run build -w server",
     "build:client": "npm run build -w client",
     "build:shared": "npm run build -w shared-types",
     "lint": "npm run lint -w client",
@@ -33,19 +33,13 @@
     "check:commits": "node scripts/check-commit-style.mjs",
     "check:rules": "node scripts/check-split13-rules.mjs",
     "check:seed": "node scripts/check-seeded-shuffle.mjs",
-    "check:hidden": "node scripts/check-hidden-cards.mjs",
-    "check:penalty": "node scripts/check-penalty-placement.mjs",
-    "check:totals": "node scripts/check-series-totals.mjs",
-    "check:peek": "node scripts/check-short-peek.mjs",
     "check:rejoin": "node scripts/check-rejoin-ownership.mjs",
     "check:refused": "node scripts/check-refused-action-answered.mjs",
-    "check:malformed": "node scripts/check-malformed-payload.mjs",
-    "check:chat": "node scripts/check-chat-retention.mjs",
     "probe": "node tools/probe/probe.mjs",
     "probe:install": "cd tools/probe && npm install && npx playwright install chromium",
     "typecheck": "tsc --noEmit -p shared-types/tsconfig.json && tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p client/tsconfig.json",
-    "verify:server": "npm run build:shared && tsc --noEmit -p shared-types/tsconfig.json && tsc --noEmit -p server/tsconfig.json && npm run build:server && npm run check:rules",
-    "verify": "npm run check:majors && npm run check:commits && npm run build:shared && npm run typecheck && npm run lint && npm run format:check && npm run build:server && npm run check:seed && npm run check:hidden && npm run check:penalty && npm run check:totals && npm run check:peek && npm run check:rejoin && npm run check:refused && npm run check:malformed && npm run check:chat && npm run build:client",
+    "verify:server": "npm run build:server && npm run typecheck && npm run check:seed && npm run check:rejoin && npm run check:refused && npm run check:rules",
+    "verify": "npm run check:majors && npm run check:commits && npm run build:shared && npm run typecheck && npm run lint && npm run format:check && npm run build:server && npm run check:seed && npm run check:rejoin && npm run check:refused && npm run check:rules && npm run build:client",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "start:server": "npm start -w server",
@@ -57,5 +51,9 @@
   "devDependencies": {
     "concurrently": "^9.2.4",
     "prettier": "3.9.6"
+  },
+  "allowScripts": {
+    "sharp@0.34.5": true,
+    "unrs-resolver@1.7.10": true
   }
 }

@@ -26,12 +26,9 @@ const {
   Suit,
   Team,
 } = await import("shared-types");
-const { gameMachine, finishHand } = await import(
-  "../server/dist/game-machine.js"
-);
-const { generatePlayerView } = await import(
-  "../server/dist/state-redactor.js"
-);
+const { gameMachine, finishHand } =
+  await import("../server/dist/game-machine.js");
+const { generatePlayerView } = await import("../server/dist/state-redactor.js");
 
 const HUMAN_ID = "human_1";
 const HANDS_TO_SWEEP = 30;
@@ -299,6 +296,92 @@ const assertScoring = () => {
   );
 };
 
+/**
+ * A malformed action must not take the game with it.
+ *
+ * Inherited from Check!'s own hard-won guard: its machine destructured
+ * payloads inside guards, so one action arriving without the shape its
+ * contract promised threw mid-transition, stopped the actor, and took the
+ * whole game down. server/src/index.ts screens payload shape for exactly this
+ * reason; this checks the machine survives even when something gets past it.
+ */
+const assertMalformedActions = async () => {
+  const actor = startedActor(11, BotDifficulty.NORMAL);
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+
+  const before = actor.getSnapshot().context;
+  const seatBefore = before.currentSeat;
+  const handsBefore = Object.values(before.players).reduce(
+    (n, p) => n + p.hand.length,
+    0,
+  );
+
+  const malformed = [
+    { type: PlayerActionType.THROW_CARD, playerId: HUMAN_ID },
+    { type: PlayerActionType.THROW_CARD, playerId: HUMAN_ID, payload: {} },
+    {
+      type: PlayerActionType.THROW_CARD,
+      playerId: HUMAN_ID,
+      payload: { cardId: null },
+    },
+    {
+      type: PlayerActionType.THROW_CARD,
+      playerId: HUMAN_ID,
+      payload: { cardId: "no-such-card" },
+    },
+    // A card that exists, but in somebody else's hand.
+    {
+      type: PlayerActionType.THROW_CARD,
+      playerId: HUMAN_ID,
+      payload: {
+        cardId: Object.values(before.players).find((p) => p.id !== HUMAN_ID)
+          ?.hand[0]?.id,
+      },
+    },
+    // The right card, the wrong player: not their turn to spend it.
+    {
+      type: PlayerActionType.THROW_CARD,
+      playerId: "nobody",
+      payload: { cardId: before.players[HUMAN_ID]?.hand[0]?.id },
+    },
+  ];
+
+  for (const event of malformed) {
+    try {
+      actor.send(event);
+    } catch {
+      check(
+        "malformed action: machine did not throw",
+        false,
+        JSON.stringify(event),
+      );
+    }
+  }
+
+  const after = actor.getSnapshot();
+  check(
+    "malformed action: the actor is still running",
+    after.status === "active",
+  );
+  check(
+    "malformed action: the game is still playable",
+    after.context.gameStage === GameStage.PLAYING,
+    `-> ${after.context.gameStage}`,
+  );
+  check(
+    "malformed action: no card left a hand",
+    Object.values(after.context.players).reduce(
+      (n, p) => n + p.hand.length,
+      0,
+    ) === handsBefore,
+  );
+  check(
+    "malformed action: the turn did not move",
+    after.context.currentSeat === seatBefore,
+  );
+  actor.stop();
+};
+
 const main = async () => {
   console.log("Split 13 rules check\n");
 
@@ -330,6 +413,7 @@ const main = async () => {
   console.log(" done");
 
   await assertRedaction();
+  await assertMalformedActions();
   assertScoring();
 
   console.log(
