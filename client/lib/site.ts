@@ -14,4 +14,4 @@ export const SITE_URL = "https://split-13.vercel.app";
 // one place because the manifest is the copy that quietly falls behind when it
 // is not, and nothing about the site looks wrong when that happens.
 export const SITE_DESCRIPTION =
-  "Split 13 is a free online card game for four players in two teams. The deck is split thirteen cards each; match the card on top of the table to capture the whole stack for your team.";
+  "Split 13 is a free online card game for one to four players in two teams of two, with bots filling any empty seat. The deck is split thirteen cards each; match the card on top of the table to capture the whole stack for your team.";

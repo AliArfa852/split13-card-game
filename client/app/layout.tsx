@@ -59,7 +59,9 @@ const gameSchema = {
   applicationCategory: "GameApplication",
   operatingSystem: "Any",
   playMode: "MultiPlayer",
-  numberOfPlayers: { "@type": "QuantitativeValue", minValue: 2, maxValue: 6 },
+  // Human players. The table is always four seats; bots fill whatever is
+  // unclaimed, so one real player is a legal game.
+  numberOfPlayers: { "@type": "QuantitativeValue", minValue: 1, maxValue: 4 },
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   isAccessibleForFree: true,
   inLanguage: "en",

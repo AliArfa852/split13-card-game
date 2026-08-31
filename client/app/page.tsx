@@ -772,7 +772,8 @@ function HomePage() {
                 transition={{ duration: 0.6, delay: 0.6 }}
                 className="mt-6 text-sm font-semibold text-ink-muted"
               >
-                Free to play with 2&ndash;6 players in the browser.
+                Free to play with 1&ndash;4 players in the browser. Bots take
+                any seat nobody claims.
               </motion.p>
             </div>
 
@@ -798,9 +799,11 @@ function HomePage() {
             figure={<SeatingDiagram />}
           >
             <p>
-              The deck splits evenly between four players in two teams, and you
-              see your own hand the whole way through. Your partner sits
-              opposite; an opponent sits on either side. There is no draw pile
+              The table is always four seats in two teams, and the deck splits
+              evenly between them — thirteen cards each. You see your own hand
+              the whole way through. Your partner sits opposite; an opponent
+              sits on either side. Bring one to three friends and bots fill the
+              rest, so a table never waits on a fourth. There is no draw pile
               and nothing to remember.
             </p>
           </StorySection>

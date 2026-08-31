@@ -160,6 +160,30 @@ version and `npm run verify:server` passes clean again (build, typecheck,
 `check:seed`/`check:rejoin`/`check:refused`, and the 35-hand `check:rules`
 sweep).
 
+### 3.35 Security work to port back ⚠️ OWED TO MAIN
+
+`main` was force-pushed to Split 13 on 2026-08-31, which took three commits
+off main's history. They are **not lost** — they are on the branch
+`security-hardening-to-port` (and were `origin/main` at `492d598`):
+
+| Commit | What it adds |
+| --- | --- |
+| `c413f70` | Bound socket resource usage (#176, Ammar Hassan) — `server/src/lib/fixed-window-rate-limiter.ts` plus `scripts/check-resource-limits.mjs` |
+| `02762bf` | Reject unauthorized socket origins (#177, Ammar Hassan) — origin admission control plus `scripts/check-origin-admission.mjs` |
+| `492d598` | Merge of upstream `vroslmend:main` |
+
+~662 lines. **None of it exists on Split 13** — the rewrite branched before it
+landed. It is transport-layer work (rate limiting, origin admission), not
+game logic, so all of it applies to Split 13 exactly as it did to Check!:
+right now the Split 13 server has no socket rate limiting and no origin
+admission control.
+
+Porting is a real merge, not a cherry-pick: both sides rewrote
+`server/src/index.ts` (the security commits touch ~290 lines of it),
+`server/.env.example`, `package.json` and `scripts/`. Expect conflicts in all
+four. `git diff main...security-hardening-to-port -- server/src/index.ts` is
+the place to start.
+
 ### 3.4 Still open
 
 - **`tools/probe/` — deleted.** You said the word: Check!'s Playwright layout
@@ -176,7 +200,8 @@ sweep).
   fixed 4-seat/2-team table, it starts from scratch — see
   `progress-tracking.md` for how to give it a `.visualmd` again.
 - `SITE_URL` is a placeholder (`https://split-13.vercel.app`). Set it before
-  sharing anything, or every social card names a site that isn't yours.
+  sharing anything, or every social card names a site that isn't yours. Now
+  tracked as step 4 of the deploy round trip in `docs/DEPLOYMENT.md`.
 - **A capture has no sweep animation.** When a throw captures, the server
   empties `stack` in the same update it pushed the card into, so the client
   never sees the pile-with-the-winning-card state. `lastCapture` carries
