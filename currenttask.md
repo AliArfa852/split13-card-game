@@ -1,10 +1,10 @@
 # Split 13 — Current Task
 
-**Updated:** 2026-08-31 (session 2) · **Branch:** `feat/split-13`
+**Updated:** 2026-08-31 (session 3) · **Branch:** `feat/split-13` · **Last commit:** `0c80bc3`
 
 Porting this repo from **Check!** (the game it was forked from) to **Split 13**. The spec is `design-vault/Redesign/Split 13 - Game Rules.md` (v2 — every open question answered). Treat that doc as the specification, the way `docs/GAME_RULES.md` was for Check!.
 
-**One-line status:** engine finished and tested; **client now compiles clean (126 errors → 0) and lints clean**. Not yet seen running in a browser — see §3.1.
+**One-line status:** engine finished and tested; client compiles and lints clean; Check!'s dead code, docs and branding are out. **Still not seen running in a browser — that needs you (§3.1).**
 
 ---
 
@@ -75,20 +75,44 @@ What to check against the rules doc:
 
 **Known environment issue:** `app/layout.tsx` fetches Nunito Sans from Google Fonts at build time. `npm run dev` degrades to a fallback font if that is unreachable; `npm run build` hard-fails. Fine on a normal connection. If you want it network-independent, the repo already ships the TTFs — but only weights 400 and 800, and the UI uses `font-semibold` (57×) and `font-bold` (34×), which would both snap to 800 and flatten the type hierarchy. Left as-is deliberately; your call.
 
-### 3.2 Rebrand pass (compiles today, still says Check!)
+### 3.2 Rebrand — DONE except the long-form copy ✅
 
-- `app/page.tsx` — landing copy and illustrations
-- `app/rules/` — still Check!'s rules; Split 13's are in `design-vault/Redesign/Split 13 - Game Rules.md`
-- `GameHeader.tsx` wordmark · `BrandMark.tsx` · `Signature.tsx` · `public/signature.svg` · `lib/site.ts`
-- Icons and share card: `app/manifest.ts`, `apple-icon.tsx`, `icon.svg`, `icon-512/`, `maskable-icon/`, `opengraph-image.tsx`
-- `client/package.json` name/description
+Done: the mark (a card back carrying **13**, used by the favicon, installed
+icon, apple-touch icon, share card, in-game card backs and the wordmark), all
+route metadata, the manifest, the header and footer wordmarks, `SITE_URL` and
+`SITE_DESCRIPTION`.
 
-### 3.3 Cleanup
+Also removed: `components/ui/Signature.tsx` and `public/signature.svg` — traced
+drawings of the original authors' handwriting, shipping under "Made by" in the
+footer. A fork cannot ship someone's signature. The credit is now words:
+"Forked from Check!", still linking to their repo.
 
-- Delete or rewrite the obsolete `scripts/check-*.mjs` (hidden cards, penalty placement, short peek, series totals) — they assert mechanics that no longer exist
-- `lib/sounds.ts` still declares 7 sprites for cut mechanics (peek/ability/penalty/check/swap/draw/skip) and their mp3s are still in `public/sounds/`
-- Port `server/.env.example` (still Check!'s knobs; Split 13 reads `TURN_TIMER_MS`, `BOT_THINK_MS`)
-- `tools/probe/` still drives Check!'s flow — rebuild against Split 13's, or drop it
+**Still Check!'s content** (compiles fine; this is writing, not code):
+
+| File                          | What is still wrong                                                                                                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/rules/RulesContent.tsx`  | ~63 references to peek / abilities / penalties / draw pile / lowest-hand. It is Check!'s rules end to end. Split 13's are in `docs/GAME_RULES.md` — write from that. |
+| `app/rules/illustrations.tsx` | ~25. Diagrams of a 2x2 grid, K/Q/J abilities and the discard pile. All need redrawing for a 13-card hand and a capture stack.                                        |
+| `app/page.tsx`                | ~18. The hero and feature sections still sell Check!'s memory game.                                                                                                  |
+
+### 3.3 Cleanup — DONE ✅
+
+Six dead check scripts deleted; the malformed-payload guard rescued into
+`check:rules`; sounds cut from 22 sprites to 13 with the orphaned mp3s
+removed; `docs/GAME_RULES.md` replaced with Split 13's spec;
+`docs/ARCHITECTURE.md` rewritten; README and CONTRIBUTING updated;
+`package.json` scripts pruned and `build:server` now builds its own contract
+first (that was the "no exported member" failure).
+
+### 3.4 Still open
+
+- **`tools/probe/`** — Check!'s Playwright layout harness, dead as written.
+  The viewport-sweep machinery is reusable; deleting a whole test tool is your
+  call. Say the word.
+- `server/.env.example` still documents Check!'s knobs. Split 13 reads
+  `TURN_TIMER_MS` and `BOT_THINK_MS`.
+- `SITE_URL` is a placeholder (`https://split-13.vercel.app`). Set it before
+  sharing anything, or every social card names a site that isn't yours.
 
 ## 4. Open decisions
 
