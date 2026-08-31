@@ -4,11 +4,11 @@ Tracks progress converting this package from Check! to Split 13. Tags reflect ho
 
 Legend: [COMPLETE] done for Split 13 (either ported, rewritten, or needed no change) · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
 
-Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
+Updated: 2026-08-31 (session 3). Update this file in the same pass as any change to a listed file.
 
 ## Top-level config
 
-- .env.example — [NEEDS WORK] — still documents Check!'s knobs (peek/matching windows, MAX_HAND_SIZE, CARDS_PER_PLAYER). Split 13 reads `TURN_TIMER_MS` (default 20000) and `BOT_THINK_MS` (default 1100).
+- .env.example — [COMPLETE] — rewritten for the vars the code actually reads (`PORT`, `CORS_ORIGIN`, `TURN_TIMER_MS`, `BOT_THINK_MS`, `SOCKET_PING_INTERVAL_MS`, `SOCKET_PING_TIMEOUT_MS`); Check!'s MAX_PLAYERS/CARDS_PER_PLAYER/MAX_HAND_SIZE/PEEK_DURATION_MS/MATCHING_STAGE_DURATION_MS/RECONNECT_TIMEOUT_MS/LOBBY_DISCONNECT_TIMEOUT_MS are gone — none of them were read by any file under src/ anymore.
 - package.json — [COMPLETE] — described for Split 13.
 - tsconfig.json — [COMPLETE]
 

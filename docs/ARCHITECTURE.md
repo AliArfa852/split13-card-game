@@ -103,8 +103,7 @@ It runs a full sweep of hands across all three bot tiers, using the seeded RNG
 so a failure is reproducible. `npm run verify:server` is the whole server gate;
 `npm run verify` adds lint, formatting and the client build.
 
-There is no component or browser test layer. Check!'s layout probe in
-`tools/probe/` still drives _its_ flow and has not been ported.
+There is no component or browser test layer. Check!'s layout probe (`tools/probe/`) drove _its_ variable player-count matrix with actions Split 13 doesn't have; it was removed rather than kept as dead code that could not run.
 
 ## 6. Where the two halves run
 

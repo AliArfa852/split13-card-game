@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { PlayingCard } from "@/components/cards/PlayingCard";
 import { CARD_RING_GEOMETRY } from "@/components/cards/cardRing";
 import { CardRank, Suit, type Card } from "shared-types";
-import { ArrowLeftRight, Eye, Lock, type LucideIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const card = (id: string, suit: Suit, rank: CardRank): Card => ({
   id,
@@ -25,25 +25,6 @@ const SizedCard = ({ overlay, className, ...cardProps }: SizedCardProps) => (
     <PlayingCard {...cardProps} className="h-full w-full" />
     {overlay}
   </div>
-);
-
-/** Corner chip in the board's SlotBadge vocabulary: surface chip, ink glyph;
- *  the icon carries the meaning (eye = peek, arrows = swap, lock = sealed). */
-const CornerChip = ({
-  icon: Icon,
-  label,
-  strokeWidth,
-}: {
-  icon: LucideIcon;
-  label?: string;
-  strokeWidth?: number;
-}) => (
-  <span
-    aria-label={label}
-    className="absolute -top-2 -right-2 z-10 rounded-full border border-hairline bg-surface p-1 text-ink shadow-sm"
-  >
-    <Icon className="h-3 w-3" strokeWidth={strokeWidth} />
-  </span>
 );
 
 /** The informational ring — ink, never accent (accent means "yours to act
@@ -95,17 +76,17 @@ const StepChip = ({ children }: { children: ReactNode }) => (
 // ---------------------------------------------------------------------------
 
 const VALUE_CARDS: { c: Card; points: string }[] = [
-  { c: card("rules-value-AS", Suit.Spades, CardRank.Ace), points: "−1" },
-  { c: card("rules-value-7H", Suit.Hearts, CardRank.Seven), points: "7" },
-  { c: card("rules-value-JC", Suit.Clubs, CardRank.Jack), points: "11" },
-  { c: card("rules-value-QD", Suit.Diamonds, CardRank.Queen), points: "12" },
-  { c: card("rules-value-KS", Suit.Spades, CardRank.King), points: "13" },
+  { c: card("rules-value-AS", Suit.Spades, CardRank.Ace), points: "20" },
+  { c: card("rules-value-7H", Suit.Hearts, CardRank.Seven), points: "5" },
+  { c: card("rules-value-TC", Suit.Clubs, CardRank.Ten), points: "10" },
+  { c: card("rules-value-QD", Suit.Diamonds, CardRank.Queen), points: "10" },
+  { c: card("rules-value-KS", Suit.Spades, CardRank.King), points: "10" },
 ];
 
 export const CardValuesStrip = () => (
   <Figure
-    label="Card values: ace scores minus one, seven scores seven, jack eleven, queen twelve, king thirteen"
-    caption="Aces are the only cards that subtract; 2–10 score face value."
+    label="Card values: ace scores twenty, seven scores five, ten, queen and king score ten each"
+    caption="Aces are worth the most by far. Everything under 10 is worth 5."
   >
     <div className="flex items-start justify-center gap-2 sm:gap-4">
       {VALUE_CARDS.map(({ c, points }) => (
@@ -118,166 +99,141 @@ export const CardValuesStrip = () => (
   </Figure>
 );
 
-export const PileDiagram = ({
-  sealed = false,
-  showHand = false,
-}: {
-  sealed?: boolean;
-  showHand?: boolean;
-}) => (
+const SEATS = [
+  { seat: 1, team: "A" },
+  { seat: 2, team: "B" },
+  { seat: 3, team: "A" },
+  { seat: 4, team: "B" },
+] as const;
+
+/** Why the turn order needs no rule of its own: seats alternate team, so
+ *  going round the table clockwise already alternates A and B. */
+export const SeatingDiagram = () => (
   <Figure
-    label={
-      sealed
-        ? "The draw pile beside the discard pile, which carries a lock chip: sealed, it can't be drawn from this turn"
-        : `The face-down draw pile with its count on the back, the face-up discard pile${showHand ? ", and a player's two-by-two hand" : ""}`
-    }
-    caption={
-      sealed ? (
-        <>
-          A successful match{" "}
-          <strong className="font-semibold text-ink">seals</strong> the pile
-          until the next turn.
-        </>
-      ) : undefined
-    }
+    label="Four seats round a table. Seats one and three are Team A, seats two and four are Team B, and play moves clockwise."
+    caption="Play moves clockwise, so the seat after yours is always an opponent and the seat opposite is always your partner."
   >
-    <div className="flex flex-wrap items-start justify-center gap-8 sm:gap-12">
-      <Pile label="Draw pile">
-        <SizedCard faceDown backCount={39} />
-      </Pile>
-      <Pile label="Discard pile">
-        <SizedCard
-          card={card("rules-pile-7C", Suit.Clubs, CardRank.Seven)}
-          overlay={
-            sealed ? (
-              <CornerChip
-                icon={Lock}
-                strokeWidth={2.5}
-                label="Sealed: can't be drawn this turn"
-              />
-            ) : undefined
-          }
-        />
-      </Pile>
-      {showHand && (
-        <Pile label="A hand">
-          <div className="inline-grid grid-cols-2 gap-2">
-            {[
-              "rules-hand-1",
-              "rules-hand-2",
-              "rules-hand-3",
-              "rules-hand-4",
-            ].map((id) => (
-              <SizedCard key={id} faceDown className="w-10 sm:w-12" />
-            ))}
+    <div className="flex items-center justify-center gap-2 sm:gap-3">
+      {SEATS.map(({ seat, team }, i) => (
+        <div key={seat} className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-col items-center gap-1.5">
+            <span
+              className={cn(
+                "flex h-12 w-12 items-center justify-center rounded-full border-2 text-sm font-extrabold sm:h-14 sm:w-14",
+                team === "A"
+                  ? "border-team-a text-team-a"
+                  : "border-team-b text-team-b",
+              )}
+            >
+              {seat}
+            </span>
+            <span
+              className={cn(
+                "text-[11px] font-bold uppercase tracking-widest",
+                team === "A" ? "text-team-a" : "text-team-b",
+              )}
+            >
+              Team {team}
+            </span>
           </div>
-        </Pile>
-      )}
-    </div>
-  </Figure>
-);
-
-const SETUP_POSITIONS = [
-  "rules-setup-1",
-  "rules-setup-2",
-  "rules-setup-3",
-  "rules-setup-4",
-];
-
-export const SetupPeekGrid = () => (
-  <Figure
-    label="A two-by-two grid of face-down cards; the bottom two carry an eye badge, and you may peek at those once"
-    caption="Your bottom two, one look. Then back face down."
-  >
-    <div className="flex justify-center">
-      <div className="inline-grid grid-cols-2 gap-2">
-        {SETUP_POSITIONS.map((id, i) => (
-          <SizedCard
-            key={id}
-            faceDown
-            overlay={
-              i >= 2 ? (
-                <InkRing>
-                  <CornerChip icon={Eye} />
-                </InkRing>
-              ) : undefined
-            }
-          />
-        ))}
-      </div>
-    </div>
-  </Figure>
-);
-
-const ABILITIES: { c: Card; icons: LucideIcon[]; text: string }[] = [
-  {
-    c: card("rules-ability-KS", Suit.Spades, CardRank.King),
-    icons: [Eye, Eye, ArrowLeftRight],
-    text: "Peek two, then swap one",
-  },
-  {
-    c: card("rules-ability-QH", Suit.Hearts, CardRank.Queen),
-    icons: [Eye, ArrowLeftRight],
-    text: "Peek one, then swap one",
-  },
-  {
-    c: card("rules-ability-JC", Suit.Clubs, CardRank.Jack),
-    icons: [ArrowLeftRight],
-    text: "Swap one",
-  },
-];
-
-export const AbilityTriptych = () => (
-  <Figure
-    label="King: peek two then swap one. Queen: peek one then swap one. Jack: swap one."
-    caption="Eye means peek, arrows mean swap. The same badges appear in play."
-  >
-    <div className="grid grid-cols-3 gap-3 sm:gap-6">
-      {ABILITIES.map(({ c, icons, text }) => (
-        <div
-          key={c.id}
-          className="flex flex-col items-center gap-3 text-center"
-        >
-          <SizedCard card={c} />
-          <div className="flex items-center gap-1.5">
-            {icons.map((Icon, i) => (
-              <span
-                key={i}
-                className="rounded-full border border-hairline bg-surface p-1 text-ink shadow-sm"
-              >
-                <Icon className="h-3 w-3" />
-              </span>
-            ))}
-          </div>
-          <p className="text-xs font-semibold leading-snug text-ink">{text}</p>
+          {i < SEATS.length - 1 && (
+            <ArrowRight className="h-4 w-4 shrink-0 text-ink-muted" />
+          )}
         </div>
       ))}
     </div>
   </Figure>
 );
 
-export const LifoStack = () => (
+const STACK_BEFORE: Card[] = [
+  card("rules-stack-4D", Suit.Diamonds, CardRank.Four),
+  card("rules-stack-KC", Suit.Clubs, CardRank.King),
+  card("rules-stack-7S", Suit.Spades, CardRank.Seven),
+];
+const MATCHING_CARD = card("rules-stack-7H", Suit.Hearts, CardRank.Seven);
+
+/** The whole game in one figure: match the top card, take everything under it. */
+export const CaptureDiagram = () => (
   <Figure
-    label="Bob's king of hearts lies on top of Alice's king of spades; Bob's resolves first, then Alice's"
-    caption="Matched specials stack. Last in resolves first."
+    label="A stack of three cards with a seven on top. Playing another seven takes all four cards."
+    caption="A capture takes the whole stack, not just the pair — and leaves the table empty."
   >
-    <div className="flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-10">
-      <div className="flex pt-3 pl-2">
-        <SizedCard card={card("rules-lifo-KS", Suit.Spades, CardRank.King)} />
-        <div className="-ml-6 -mt-3 rotate-3">
-          <SizedCard card={card("rules-lifo-KH", Suit.Hearts, CardRank.King)} />
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-6">
+      <Pile label="On the table · 20 pts">
+        <div className="relative h-[4.9rem] w-14 sm:h-[5.6rem] sm:w-16">
+          {STACK_BEFORE.map((c, i) => (
+            <div
+              key={c.id}
+              className="absolute inset-0"
+              style={{
+                zIndex: i,
+                transform: `translate(${(STACK_BEFORE.length - 1 - i) * -4}px, ${
+                  (STACK_BEFORE.length - 1 - i) * -4
+                }px)`,
+              }}
+            >
+              <SizedCard card={c} className="w-14 sm:w-16" />
+            </div>
+          ))}
         </div>
+      </Pile>
+
+      <div className="flex flex-col items-center gap-1">
+        <ArrowRight className="h-5 w-5 text-ink-muted" />
+        <span className="text-[11px] font-semibold text-ink-muted">
+          you throw
+        </span>
       </div>
-      <ol className="space-y-2 text-sm text-ink-muted">
-        <li className="flex items-center gap-2.5">
-          <StepChip>1</StepChip>
-          Bob’s King resolves first because it landed last.
-        </li>
-        <li className="flex items-center gap-2.5">
-          <StepChip>2</StepChip>
-          Then Alice’s.
-        </li>
-      </ol>
+
+      <Pile label="Matches the 7">
+        <SizedCard
+          card={MATCHING_CARD}
+          className="w-14 sm:w-16"
+          overlay={<InkRing />}
+        />
+      </Pile>
+
+      <div className="flex flex-col items-center gap-1">
+        <ArrowRight className="h-5 w-5 text-ink-muted" />
+        <span className="text-[11px] font-semibold text-ink-muted">
+          you take
+        </span>
+      </div>
+
+      <Pile label="Your team · 25 pts">
+        <div className="flex items-center">
+          {[...STACK_BEFORE, MATCHING_CARD].map((c, i) => (
+            <div key={c.id} className={cn(i > 0 && "-ml-9 sm:-ml-10")}>
+              <SizedCard card={c} className="w-14 sm:w-16" />
+            </div>
+          ))}
+        </div>
+      </Pile>
+    </div>
+  </Figure>
+);
+
+/** What a turn costs you when you cannot capture: the pot grows, and the
+ *  next player is on the other team. */
+export const RiskDiagram = () => (
+  <Figure
+    label="Three steps: a stack worth ten, a king added to make it twenty, and an opponent capturing all of it."
+    caption="Every card you cannot capture with makes the stack worth more to whoever does."
+  >
+    <div className="mx-auto flex max-w-md flex-col gap-3">
+      {[
+        { n: "1", text: "The stack is worth 10. You hold no matching card." },
+        { n: "2", text: "You throw a King. The stack is now worth 20." },
+        {
+          n: "3",
+          text: "The next player matches it and takes all 20 for their team.",
+        },
+      ].map(({ n, text }) => (
+        <div key={n} className="flex items-start gap-3">
+          <StepChip>{n}</StepChip>
+          <p className="text-sm leading-relaxed text-ink-muted">{text}</p>
+        </div>
+      ))}
     </div>
   </Figure>
 );

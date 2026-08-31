@@ -25,7 +25,7 @@ import { useDevice } from "@/context/DeviceContext";
 import { PlayingCard } from "@/components/cards/PlayingCard";
 import type { Card } from "shared-types";
 import { Suit, CardRank } from "shared-types";
-import { AbilityTriptych, PileDiagram } from "@/app/rules/illustrations";
+import { CaptureDiagram, SeatingDiagram } from "@/app/rules/illustrations";
 
 const NAV_ITEMS = [
   { label: "How it plays", href: "#how" },
@@ -671,9 +671,9 @@ function HomePage() {
                 transition={{ duration: 0.6, ease: REVEAL_EASE, delay: 0.25 }}
                 className="mt-7 text-lg leading-snug text-ink-muted sm:text-2xl"
               >
-                You only ever saw two of your cards.
+                Match the card on top, take the whole pile.
                 <br />
-                Lowest hand wins.
+                Highest team score wins.
               </motion.p>
 
               <motion.div
@@ -794,50 +794,51 @@ function HomePage() {
         >
           <StorySection
             kicker="The deal"
-            title="A hand you barely know"
-            figure={<PileDiagram showHand />}
+            title="Thirteen each, nothing hidden from you"
+            figure={<SeatingDiagram />}
           >
             <p>
-              Four cards land face down in front of you, and you may peek at
-              your bottom two, once. From then on it is draw, swap, and discard:
-              every card that crosses the table is information, and the sharpest
-              memory holds the advantage.
+              The deck splits evenly between four players in two teams, and you
+              see your own hand the whole way through. Your partner sits
+              opposite; an opponent sits on either side. There is no draw pile
+              and nothing to remember.
             </p>
           </StorySection>
 
           <StorySection
-            kicker="The specials"
-            title="Specials earn their keep"
-            figure={<AbilityTriptych />}
+            kicker="The capture"
+            title="Match the top, take the pile"
+            figure={<CaptureDiagram />}
             flip
           >
             <p>
-              Kings, Queens and Jacks score heavy, but discarding one triggers
-              its ability: peek at hidden cards or swap anything on the table.
-              Everyone sees which cards you touch. Only you see the faces.
+              Throw a card matching the one on top of the stack and the whole
+              pile is yours — every card thrown since the last capture, scored
+              for your team. Rank is all that counts; suits never matter here.
             </p>
           </StorySection>
 
           <StorySection
-            kicker="The call"
-            title="One call ends it"
+            kicker="The risk"
+            title="Every throw feeds the pot"
             figure={
               <div className="rounded-card border border-hairline p-10 sm:p-14">
                 <div className="flex flex-col items-center text-center">
                   <span className="-rotate-2 text-5xl font-extrabold leading-none tracking-tight text-ink sm:text-6xl">
-                    CHECK.
+                    20 PTS.
                   </span>
                   <span className="mt-4 text-xs font-semibold text-ink-muted">
-                    Your hand locks. Everyone gets one last turn.
+                    On the table. The next player is an opponent.
                   </span>
                 </div>
               </div>
             }
           >
             <p>
-              Convinced your total is the lowest? Call Check. Your hand locks,
-              every other player takes one final turn, then all cards flip and
-              the lowest hand wins the round.
+              When you cannot capture you still have to throw, and whatever you
+              throw makes the stack worth more to whoever takes it. The seat
+              after yours is always on the other team — so the question every
+              turn is whether the pot comes to you or to them.
             </p>
           </StorySection>
         </div>
@@ -846,7 +847,7 @@ function HomePage() {
           <div className="mx-auto w-full max-w-4xl px-5 sm:px-8">
             <Reveal className="text-center">
               <h2 className="text-4xl font-extrabold tracking-tight text-ink sm:text-6xl">
-                Play a round
+                Play a hand
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-lg font-normal text-ink-muted">
                 Create a lobby and send the link to your friends. No account

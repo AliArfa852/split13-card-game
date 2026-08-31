@@ -23,8 +23,8 @@ const SPRITES = {
 } as const;
 export type SpriteName = keyof typeof SPRITES;
 
-const MUTE_KEY = "check:muted";
-const VOLUME_KEY = "check:volume";
+const MUTE_KEY = "split13:muted";
+const VOLUME_KEY = "split13:volume";
 const DEFAULT_VOLUME = 0.7;
 
 let ctx: AudioContext | null = null;

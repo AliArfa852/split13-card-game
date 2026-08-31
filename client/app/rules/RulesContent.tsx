@@ -6,11 +6,10 @@ import { ArrowRight, ChevronLeft } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import type { ReactNode } from "react";
 import {
-  AbilityTriptych,
+  CaptureDiagram,
   CardValuesStrip,
-  LifoStack,
-  PileDiagram,
-  SetupPeekGrid,
+  RiskDiagram,
+  SeatingDiagram,
 } from "./illustrations";
 
 // One quiet fade-up for every reveal. The variants carry no `ease`/`type`
@@ -36,14 +35,14 @@ const SECTIONS: SectionMeta[] = [
     title: "The deck and card values",
     short: "Card values",
   },
-  { id: "the-table", num: "03", title: "The table" },
+  { id: "the-table", num: "03", title: "The table and the teams", short: "The table" },
   { id: "setup", num: "04", title: "Setup" },
   { id: "your-turn", num: "05", title: "Your turn" },
-  { id: "matching", num: "06", title: "Matching" },
-  { id: "special-cards", num: "07", title: "Special cards" },
-  { id: "check", num: "08", title: "Check and final turns", short: "Check" },
-  { id: "scoring", num: "09", title: "Scoring" },
-  { id: "fine-print", num: "10", title: "Fine print" },
+  { id: "capturing", num: "06", title: "Capturing the stack", short: "Capturing" },
+  { id: "risk", num: "07", title: "What makes it hard", short: "The risk" },
+  { id: "scoring", num: "08", title: "Scoring" },
+  { id: "ending", num: "09", title: "How a hand ends" },
+  { id: "bots", num: "10", title: "Bots and fine print", short: "Bots" },
 ];
 
 const sec = (id: string): SectionMeta => SECTIONS.find((s) => s.id === id)!;
@@ -137,7 +136,7 @@ export default function RulesContent() {
             >
               <ChevronLeft className="h-4 w-4 text-ink-muted transition-colors group-hover:text-ink" />
               <span className="text-lg font-bold tracking-tight text-ink">
-                Check
+                Split 13
               </span>
             </Link>
             <ThemeToggle />
@@ -153,14 +152,14 @@ export default function RulesContent() {
               Rules
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg">
-              Check! is a fast-paced card game of strategy, memory, and a little
-              luck. Keep your hand’s total low, watch everything, and call it
-              when you’re sure.
+              Split 13 is a partnership game about a growing pot. Nothing is
+              hidden from you but the other three hands, and every card you
+              throw is a bet on who takes the pile.
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
-              <MetaChip>2–6 players</MetaChip>
-              <MetaChip>52 cards</MetaChip>
-              <MetaChip>one round</MetaChip>
+              <MetaChip>4 players, 2 teams</MetaChip>
+              <MetaChip>52 cards, 13 each</MetaChip>
+              <MetaChip>20s a turn</MetaChip>
             </div>
 
             <nav
@@ -185,254 +184,169 @@ export default function RulesContent() {
 
           <RuleSection meta={sec("goal")}>
             <p>
-              Every player tends a small grid of face-down cards. When the round
-              ends, all hands are revealed. The player holding the{" "}
-              <Term>lowest total value</Term> wins.
+              Four players sit as <Term>two teams of two</Term>. Cards thrown on
+              the table pile up into a stack, and matching the card on top of it
+              takes the whole pile for your team.
             </p>
             <p>
-              You’ll get there by swapping unknown cards for better ones,
-              discarding the heavy ones, and matching your way to a smaller
-              hand. End the round with a confident <Term>“Check”</Term> before
-              anyone can slim down further.
+              When every card has been thrown, the team that captured the most{" "}
+              <Term>points</Term> wins the hand. Equal totals is a draw.
             </p>
           </RuleSection>
 
           <RuleSection meta={sec("card-values")} figure={<CardValuesStrip />}>
             <p>
-              Check! uses a standard 52-card deck, no jokers.{" "}
-              <Term>Aces are worth −1</Term>, the only cards that subtract.
-              Number cards score their face value, so a 7 is 7 points.{" "}
-              <Term>Jack 11, Queen 12, King 13</Term>: the heaviest cards in the
-              deck. Each carries an ability (section 07).
+              A standard 52-card deck, no jokers. <Term>Aces are worth 20</Term>
+              , far more than anything else. <Term>Tens and the picture cards</Term>{" "}
+              are worth 10 each, and <Term>everything from 2 to 9</Term> is worth
+              5.
+            </p>
+            <p>
+              That puts 400 points in the deck, and it is why an Ace on the table
+              changes a hand: one card can be worth four of the small ones.
             </p>
           </RuleSection>
 
-          <RuleSection
-            meta={sec("the-table")}
-            figure={<PileDiagram showHand />}
-          >
-            <p>Three things live on the table:</p>
-            <ul className="list-disc space-y-1.5 pl-5">
-              <li>
-                <Term>The draw pile</Term>: face down. The remaining count sits
-                right on the top card’s back.
-              </li>
-              <li>
-                <Term>The discard pile</Term>: face up. Only the top card
-                matters, and everyone can see it.
-              </li>
-              <li>
-                <Term>Your hand</Term>: four cards dealt face down in a 2×2 grid
-                in front of you. You don’t get to look at them, with one
-                exception (next section).
-              </li>
-            </ul>
-          </RuleSection>
-
-          <RuleSection meta={sec("setup")} figure={<SetupPeekGrid />}>
+          <RuleSection meta={sec("the-table")} figure={<SeatingDiagram />}>
             <p>
-              Players gather in a lobby and the game master starts the game.{" "}
-              <Term>The moment it starts, the lobby locks</Term>; nobody else
-              can join.
+              Always <Term>four seats</Term>. Seats 1 and 3 are Team A, seats 2
+              and 4 are Team B, so your partner sits opposite you and an opponent
+              sits on either side.
             </p>
             <p>
-              Everyone receives four cards, face down, in a 2×2 grid. Then comes
-              the one free look of the game, the <Term>initial peek</Term>: you
-              may secretly look at your <Term>bottom two cards</Term>, just
-              those, just once. Memorize them; they go back face down.
+              You pick your seat in the lobby, and the seat decides your team.
+              Once the host starts the game, <Term>seats are locked</Term> for
+              the life of the room.
+            </p>
+            <p>
+              You do not need three friends. Any seat nobody takes is filled by a
+              bot, so one player and three bots is a real game.
+            </p>
+          </RuleSection>
+
+          <RuleSection meta={sec("setup")}>
+            <p>
+              The deck is shuffled and dealt out entirely:{" "}
+              <Term>thirteen cards each</Term>, nothing held back and no draw
+              pile. You see your own hand, sorted by rank, for the whole hand.
+              You never see anyone else&rsquo;s.
+            </p>
+            <p>
+              One seat is picked at random to go first. After that, play moves
+              clockwise, which — because the seats alternate — means the turn
+              order runs A, B, A, B all the way round.
             </p>
           </RuleSection>
 
           <RuleSection meta={sec("your-turn")}>
             <p>
-              Turns move around the table. On yours, you <Term>must draw</Term>,
-              one of two ways, and every turn ends with a card landing face up
-              on the discard pile.
+              On your turn you throw <Term>exactly one card</Term>, face up, onto
+              the table stack. That is the whole turn. There is nothing to draw,
+              nothing to swap and nothing to declare.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <OptionPanel title="Draw from the draw pile">
-                Look at the card privately, then either <Term>swap</Term> it
-                face down into your grid, sending the card it replaces face up
-                onto the discard pile, or <Term>discard</Term> the drawn card
-                directly.
+              <OptionPanel title="Your card matches the top">
+                You capture. The stack is yours — see below.
               </OptionPanel>
-              <OptionPanel title="Take the top discard">
-                Only if the pile isn’t sealed (section 06), and{" "}
-                <Term>never a King, Queen, or Jack</Term>. You must swap it into
-                your grid. Everyone already knows the card, so they will watch
-                where it lands.
+              <OptionPanel title="It doesn&rsquo;t match">
+                Your card becomes the new top of the stack, and the turn passes.
               </OptionPanel>
             </div>
             <p>
-              A drawn King, Queen, or Jack does nothing by itself.{" "}
-              <Term>
-                Abilities trigger only when a special card is discarded
-              </Term>{" "}
-              from your hand, never when you tuck one in. Every discard
-              immediately opens the matching window (section 06); once it closes
-              and any abilities resolve, the turn passes on.
-            </p>
-            <div>
-              <h3 className="text-sm font-bold text-ink">
-                If the clock runs out
-              </h3>
-              <p className="mt-1.5 text-sm">
-                Every decision window is limited, 45 seconds by default, so
-                nobody can stall the table:
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-                <li>
-                  Haven’t drawn? You draw from the draw pile automatically.
-                </li>
-                <li>Still holding a deck draw? It’s discarded for you.</li>
-                <li>
-                  Still holding a discard-pile draw? It’s swapped with the first
-                  card in your grid.
-                </li>
-                <li>An unresolved ability fizzles (section 10).</li>
-                <li>
-                  Never ready for the initial peek? The peek phase starts
-                  without you.
-                </li>
-              </ul>
-            </div>
-          </RuleSection>
-
-          <RuleSection meta={sec("matching")} figure={<PileDiagram sealed />}>
-            <p>
-              The instant <Term>any</Term> card lands face up on the discard
-              pile, a short real-time window opens, about <Term>5 seconds</Term>
-              , and every unlocked player,{" "}
-              <Term>including whoever just discarded</Term>, may race to throw a
-              card of the <Term>exact same rank</Term> from their hand onto it.
-            </p>
-            <p>
-              <Term>Hit it</Term> and your card leaves your hand. The pile also{" "}
-              <Term>seals</Term>: nobody may draw from it until the start of the
-              next turn. Match a special card onto a special card and both
-              abilities trigger (section 07).
-            </p>
-            <p>
-              <Term>Miss</Term> with a wrong-rank card and it comes straight
-              back, and you immediately <Term>draw a penalty card</Term>. The
-              window stays open for everyone, and you may even try again with a
-              different card.
-            </p>
-            <p>
-              <Term>Pass</Term> and it’s final for that window; no changing your
-              mind. The window closes when someone hits, everyone has passed, or
-              time runs out.
-            </p>
-            <p>
-              Two edges worth knowing: match away your <Term>last card</Term>{" "}
-              and you’ve automatically called Check (section 08). Balloon to{" "}
-              <Term>eight cards</Term> through penalties and you’re{" "}
-              <Term>disqualified</Term>: locked out of the round, your hand
-              still scored, no way to win. If disqualifications ever leave fewer
-              than two active players with no Check in progress, the round
-              simply ends.
+              Every turn is clocked at <Term>20 seconds</Term>, and the timer is
+              visible to everyone. If it runs out, the server throws a random
+              card from your hand for you — and if that card happens to match,
+              it captures like any other.
             </p>
           </RuleSection>
 
-          <RuleSection
-            meta={sec("special-cards")}
-            figure={
-              <div className="space-y-4">
-                <AbilityTriptych />
-                <LifoStack />
-              </div>
-            }
-          >
+          <RuleSection meta={sec("capturing")} figure={<CaptureDiagram />}>
             <p>
-              Discarding a King, Queen, or Jack, on your turn or as a match,
-              triggers its ability:
-            </p>
-            <ul className="list-disc space-y-1.5 pl-5">
-              <li>
-                <Term>King</Term>: peek at any two cards on the table, then swap
-                any one card with any other.
-              </li>
-              <li>
-                <Term>Queen</Term>: peek at any one card, then swap any one card
-                with any other.
-              </li>
-              <li>
-                <Term>Jack</Term>: no peek, straight to the swap.
-              </li>
-            </ul>
-            <p>
-              Both stages are optional: skip the peek, skip the swap, or let the
-              whole thing go. Peeking isn’t invisible:{" "}
-              <Term>everyone sees which positions you peek at</Term>; only you
-              see the faces.
+              A capture needs the <Term>same rank</Term>, in any suit: any 7
+              takes a 7. Suits never matter in this game.
             </p>
             <p>
-              When a special is matched onto another special, both abilities
-              stack and resolve <Term>last-in, first-out</Term>. Alice discards
-              a King; Bob matches it with his own. Bob’s King resolves first,
-              then Alice’s.
+              You take <Term>the entire stack</Term> — every card thrown since
+              the last capture, not just the pair — and it goes to your team&rsquo;s
+              pile. The table is left completely empty, so the next player starts
+              a fresh stack and cannot capture anything.
+            </p>
+            <p>
+              Capturing <Term>ends your turn</Term>. There is no bonus throw.
             </p>
           </RuleSection>
 
-          <RuleSection meta={sec("check")}>
+          <RuleSection meta={sec("risk")} figure={<RiskDiagram />}>
             <p>
-              Convinced your total is the lowest at the table? On your turn,
-              with nothing else pending and final turns not already underway,{" "}
-              <Term>call “Check.”</Term>
+              Here is the whole difficulty. When you cannot capture, you still
+              have to throw something — and whatever you throw makes the stack{" "}
+              <Term>worth more to whoever takes it next</Term>.
             </p>
             <p>
-              Your turn ends instantly and you’re <Term>locked</Term>: no more
-              turns, no matching, and <Term>your cards can’t be touched</Term>{" "}
-              by anyone’s abilities.
+              The seat after yours always belongs to the other team. So throwing
+              your Ace into a fat stack is handing an opponent 20 points if they
+              can match it, and holding it means you are still carrying it when
+              the cards run out.
             </p>
             <p>
-              Everyone else now gets exactly <Term>one last turn</Term>, played
-              under the full rules: matching windows, abilities, all of it.
-              Nobody else may call Check during final turns.
-            </p>
-            <p>
-              And if a match ever empties your hand outright, that’s an{" "}
-              <Term>automatic Check</Term>: same lock, same final turns for
-              everyone else.
+              The table shows the stack&rsquo;s running value for exactly this
+              reason: it is the number the decision turns on.
             </p>
           </RuleSection>
 
           <RuleSection meta={sec("scoring")}>
             <p>
-              After final turns, every hand flips face up and the totals are
-              counted, aces still −1. <Term>Lowest total wins.</Term> A tie is
-              shared: all tied players win. The game is a single round.
+              Scoring is <Term>per team</Term>, never per player. Anything you
+              capture and anything your partner captures land in the same pile,
+              and both scores update the moment a capture happens.
+            </p>
+            <p>
+              Every card in a captured stack counts, not just the one that
+              triggered it.
             </p>
           </RuleSection>
 
-          <RuleSection meta={sec("fine-print")}>
-            <dl className="divide-y divide-hairline">
-              <div className="py-4 first:pt-0 last:pb-0">
-                <dt className="text-sm font-bold text-ink">
-                  The draw pile runs dry
-                </dt>
-                <dd className="mt-1 text-sm leading-relaxed">
-                  The discard pile’s top card stays put; everything beneath it
-                  shuffles into a fresh face-down draw pile.
+          <RuleSection meta={sec("ending")}>
+            <p>
+              The hand ends the moment all four players have thrown all thirteen
+              of their cards — 52 throws, thirteen times round the table.
+            </p>
+            <p>
+              Whatever is <Term>still sitting on the table</Term> was thrown but
+              never matched. It is discarded, and scores for nobody. Those are
+              real points that simply leave the game, which is why the last few
+              throws matter more than they look.
+            </p>
+            <p>
+              Higher team total wins the hand.{" "}
+              <Term>Equal totals is a draw</Term> — no sudden death, no tiebreak.
+            </p>
+          </RuleSection>
+
+          <RuleSection meta={sec("bots")}>
+            <dl className="space-y-4">
+              <div>
+                <dt className="font-semibold text-ink">Bot difficulty</dt>
+                <dd className="mt-1">
+                  Set once per room by the host. <Term>Easy</Term> throws at
+                  random. <Term>Normal</Term> captures whenever it can, then
+                  throws its cheapest card. <Term>Hard</Term> also tracks which
+                  ranks are used up, so it knows which of its cards nobody can
+                  match any more and dumps the expensive ones then.
                 </dd>
               </div>
-              <div className="py-4 first:pt-0 last:pb-0">
-                <dt className="text-sm font-bold text-ink">
-                  Nothing left to draw anywhere
-                </dt>
-                <dd className="mt-1 text-sm leading-relaxed">
-                  If a draw is required, a penalty for example, and neither pile
-                  can provide even after reshuffling, the game ends on the spot
-                  and hands are scored as they lie.
+              <div>
+                <dt className="font-semibold text-ink">If someone leaves</dt>
+                <dd className="mt-1">
+                  A bot takes the seat and the hand carries on. An empty seat
+                  would be a turn nobody could take.
                 </dd>
               </div>
-              <div className="py-4 first:pt-0 last:pb-0">
-                <dt className="text-sm font-bold text-ink">
-                  Fizzled abilities
-                </dt>
-                <dd className="mt-1 text-sm leading-relaxed">
-                  If your ability’s turn on the stack comes up but you’re
-                  locked, it fizzles: removed with no effect.
+              <div>
+                <dt className="font-semibold text-ink">Playing again</dt>
+                <dd className="mt-1">
+                  The host deals another hand into the same room. Seats, teams
+                  and the running tally of hands won all stay as they are.
                 </dd>
               </div>
             </dl>
@@ -443,14 +357,14 @@ export default function RulesContent() {
               <p className="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
                 Ready?
               </p>
-              <p className="mt-2 text-ink-muted">Lowest hand wins.</p>
+              <p className="mt-2 text-ink-muted">Take the pile.</p>
               <div className="mt-8 flex justify-center">
                 <Link
                   href="/"
                   data-cursor-link
                   className={`flex h-14 items-center justify-center gap-2 rounded-full bg-accent px-8 text-base font-bold text-accent-ink transition-colors hover:bg-accent/90 ${FOCUS_RING}`}
                 >
-                  Play a round
+                  Play a hand
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -460,9 +374,9 @@ export default function RulesContent() {
 
         <footer className="border-t border-hairline">
           <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-between gap-2 px-5 py-8 text-xs text-ink-muted sm:flex-row sm:px-8">
-            <span>© {new Date().getFullYear()} Check</span>
+            <span>© {new Date().getFullYear()} Split 13</span>
             <a
-              href="https://github.com/vroslmend/check-the-card-game-v2/blob/main/docs/GAME_RULES.md"
+              href="https://github.com/AliArfa852/split13-card-game/blob/main/docs/GAME_RULES.md"
               target="_blank"
               rel="noreferrer"
               data-cursor-link

@@ -24,7 +24,7 @@ import { Team } from "shared-types";
 import { cn } from "@/lib/utils";
 
 const MAX_CHAT_MESSAGE_LENGTH = 500;
-const TAB_KEY = "check:panel-tab";
+const TAB_KEY = "split13:panel-tab";
 const GROUP_WINDOW_MS = 2 * 60 * 1000;
 
 type Tab = "activity" | "chat" | "standings";

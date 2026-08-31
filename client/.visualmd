@@ -4,7 +4,7 @@ Tracks progress converting this package from Check! to Split 13. Tags reflect ho
 
 Legend: [COMPLETE] done for Split 13 (either ported, rewritten, or needed no change) · [IN PROGRESS] being worked on now · [NEEDS WORK] exists, must change/be replaced/repurposed · [MISSING] doesn't exist yet, needs to be created · [WARNING] works but flagged for review · [ERROR] known bug
 
-Updated: 2026-08-30. Update this file in the same pass as any change to a listed file.
+Updated: 2026-08-31 (session 3). Update this file in the same pass as any change to a listed file.
 
 ## Top-level config
 
@@ -17,9 +17,9 @@ Updated: 2026-08-30. Update this file in the same pass as any change to a listed
 - app/layout.tsx — [WARNING] — compiles and runs, but `next/font/google` fetches Nunito Sans at build time. In any network-restricted environment the production build FAILS on it (dev degrades to a fallback font with a warning). The repo already ships `app/fonts/NunitoSans-{Regular,ExtraBold}.ttf`; switching to `next/font/local` would remove the dependency, but only 400 and 800 exist locally and the UI uses `font-semibold` (57×) and `font-bold` (34×), which would both snap to 800 and flatten the type hierarchy. Left alone deliberately — a decision for the user, not a silent workaround.
 - app/providers.tsx — [COMPLETE] — ported. The peek/ability socket bridges and their cleanups are gone; state type renamed.
 - app/globals.css — [COMPLETE] for the port — added `--team-a` / `--team-b` tokens (light + dark + `@theme`). Blue vs amber: the safest pair for colour-blind viewers, and neither reads as the red accent. A wider rebrand pass is still open.
-- app/page.tsx — [NEEDS WORK] — compiles; copy and illustrations are still Check!'s.
-- app/rules/{page,RulesContent,illustrations}.tsx — [NEEDS WORK] — compiles; content is Check!'s rules and needs Split 13's.
-- app/manifest.ts · apple-icon.tsx · icon.svg · icon-512/route.tsx · maskable-icon/route.tsx · opengraph-image.tsx — [NEEDS WORK] — rebrand.
+- app/page.tsx — [COMPLETE] — copy rewritten for Split 13 (capture/team framing replaces peek/lowest-hand). Not yet committed.
+- app/rules/page.tsx — [COMPLETE]. app/rules/{RulesContent,illustrations}.tsx — [COMPLETE] — rewritten for Split 13's rules (capture, stack, teams); the ~63 Check!-specific references (peek/ability/penalty/draw pile) are gone. Not yet committed.
+- app/manifest.ts · apple-icon.tsx · icon.svg · icon-512/route.tsx · maskable-icon/route.tsx · opengraph-image.tsx — [COMPLETE] — rebranded (confirmed no "Check" text in any of the five).
 - app/robots.ts · sitemap.ts · fonts/ · game/layout.tsx · game/[gameId]/{page,GameClient}.tsx — [COMPLETE]
 
 ## components/cards/ (game-agnostic primitives)
@@ -37,7 +37,7 @@ Updated: 2026-08-30. Update this file in the same pass as any change to a listed
 - TurnTimer.tsx — [COMPLETE] — NEW. The 20s clock, shown to everyone, counted against the server's deadline rather than a local countdown so it cannot drift from what the server will actually fire.
 - GameLobby.tsx — [COMPLETE] — ported. Four fixed seats in seat order, `hostId`, a solo host against three bots is a legal table, and the status line names how many seats bots will fill.
 - GameEventCaption.tsx — [COMPLETE] — ported. Check!'s "final turns" line became a last-lap warning that names what is about to be stranded.
-- GameHeader.tsx — [NEEDS WORK] — compiles and works; still says "Check!" in the wordmark.
+- GameHeader.tsx — [COMPLETE] — wordmark reads "Split 13" with the rebranded BrandMark; the `Check` import is the unrelated lucide checkmark icon used for the copy-link confirmation.
 - GameUI.tsx — [COMPLETE] — unchanged; its view switch still holds.
 - useGameSounds.ts — [COMPLETE] — rebuilt against Split 13's deltas: throw (stack grows), capture, deal, start, hand over, join/leave, ready/unready, your turn, chat, and a tick in the last 5s of YOUR turn only.
 - DELETED (12): AbilityMoment · MatchMoment · PenaltyMoment · CheckMoment · HandGrid · LearnCheckSheet · RoundSummary · ActionController · ActionControllerView · ActionFactories · ActionBarComponent · ActionButton
@@ -45,11 +45,11 @@ Updated: 2026-08-30. Update this file in the same pass as any change to a listed
 ## components/layout/ · modals/ · providers/ · ui/
 
 - layout/LoadingOrError.tsx — [COMPLETE]
-- layout/SidePanel.tsx — [COMPLETE] — standings tab is now two team rows (never reorders; Team A is always first) listing each team's members, hands won and points.
+- layout/SidePanel.tsx — [COMPLETE] — standings tab is now two team rows (never reorders; Team A is always first) listing each team's members, hands won and points. sessionStorage key renamed `check:panel-tab` -> `split13:panel-tab`.
 - modals/NewGameModal.tsx — [COMPLETE] — the 2-6 seat picker became the bot-difficulty room setting.
 - modals/{ColdStartWaitNotice,JoinGameModal,RejoinModal}.tsx — [COMPLETE]
 - providers/{CursorProvider,SmoothScrollProvider}.tsx — [COMPLETE]
-- ui/* (18 shadcn primitives) — [COMPLETE], except BrandMark.tsx and Signature.tsx — [NEEDS WORK] (rebrand).
+- ui/* (18 shadcn primitives) — [COMPLETE], including BrandMark.tsx (rebranded to the 13 mark). Signature.tsx deleted — traced from the original authors' handwriting, cannot ship in a fork; footer credit is now text ("Forked from Check!", linking to their repo).
 
 ## context/ · hooks/ · lib/ · machines/
 
@@ -58,14 +58,14 @@ Updated: 2026-08-30. Update this file in the same pass as any change to a listed
 - lib/{card-motion,logger,socket,stampQueue,utils}.ts — [COMPLETE]
 - lib/actors.ts — [COMPLETE] — `createGameActor` takes `botDifficulty`, not `maxPlayers`.
 - lib/types.ts — [COMPLETE] — `isDrawnCard` deleted.
-- lib/sounds.ts — [WARNING] — added a `capture` sprite. Seven sprites for cut mechanics (peek/ability/penalty/check/swap/draw/skip) are still declared and their mp3s still on disk; harmless, but dead weight to clear later.
-- lib/site.ts — [NEEDS WORK] — rebrand.
+- lib/sounds.ts — [COMPLETE] — sprite set already cut to the 13 Split 13 can make (verified: exactly those 13 mp3s exist on disk, nothing orphaned). localStorage keys renamed `check:muted`/`check:volume` -> `split13:muted`/`split13:volume`.
+- lib/site.ts — [COMPLETE] — SITE_URL/SITE_DESCRIPTION already Split 13's (SITE_URL is still the placeholder `https://split-13.vercel.app`, tracked in currenttask.md §3.4, not a rebrand gap).
 - machines/uiMachine.ts — [COMPLETE] — ported, 72 errors to 0. Kept cold start, reconnect, rejoin, server-clock offset, the unanswered-action watchdog and session persistence; removed the peek/matching/ability states and the nine dead turn actions.
 
 ## public/
 
-- noise.svg — [COMPLETE] · signature.svg — [NEEDS WORK] (rebrand) · sounds/ — [WARNING] (see lib/sounds.ts)
+- noise.svg — [COMPLETE] · signature.svg — deleted with Signature.tsx (see above) · sounds/ — [WARNING] (see lib/sounds.ts)
 
 ## Verified
 
-`npx tsc --noEmit -p client/tsconfig.json` — **0 errors** (was 126). `npm run lint` — clean. Production build and a live browser check are still outstanding: see app/layout.tsx above, and currenttask.md.
+`npx tsc --noEmit -p client/tsconfig.json` — **0 errors** (was 126), re-checked 2026-08-31 after the copy rewrite. `npm run lint` — clean. Production build and a live browser check are still outstanding: see app/layout.tsx above, and currenttask.md.
