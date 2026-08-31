@@ -11,14 +11,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useUISelector, type UIMachineSnapshot } from "@/context/GameUIContext";
-import { GameStage } from "shared-types";
+import { GameStage, SEAT_COUNT } from "shared-types";
 
 const CAPTION_VISIBLE_MS = 4000;
 
 // Display-only glyph — same mapping the retired toast rail used.
 const glyphFor = (message: string): LucideIcon => {
   const m = message.toLowerCase();
-  if (m.includes("matched")) return Sparkles;
+  if (m.includes("captured")) return Sparkles;
   if (m.includes("shuffled")) return Shuffle;
   if (m.includes("disqualified")) return Ban;
   return Info;
@@ -26,11 +26,16 @@ const glyphFor = (message: string): LucideIcon => {
 
 const selectCaptionContext = (state: UIMachineSnapshot) => {
   const gs = state.context.currentGameState;
-  const callerId = gs?.checkDetails?.callerId ?? null;
+  const cardsRemaining = gs?.cardsRemaining ?? 0;
   return {
     log: gs?.log ?? null,
-    isFinalTurns: gs?.gameStage === GameStage.FINAL_TURNS,
-    callerName: callerId ? (gs?.players[callerId]?.name ?? null) : null,
+    // Split 13's equivalent of Check!'s "final turns" warning: the last time
+    // round the table, when what is already on the stack is the last of it.
+    isLastLap:
+      gs?.gameStage === GameStage.PLAYING &&
+      cardsRemaining > 0 &&
+      cardsRemaining <= SEAT_COUNT,
+    cardsRemaining,
   };
 };
 
@@ -47,7 +52,8 @@ interface Caption {
  * so appearing/disappearing text never reflows the board.
  */
 export const GameEventCaption = () => {
-  const { log, isFinalTurns, callerName } = useUISelector(selectCaptionContext);
+  const { log, isLastLap, cardsRemaining } =
+    useUISelector(selectCaptionContext);
   const [caption, setCaption] = React.useState<Caption | null>(null);
   // Everything present on first sight (mount, rejoin) is history, not news.
   const seenIds = React.useRef<Set<string> | null>(null);
@@ -63,12 +69,7 @@ export const GameEventCaption = () => {
     for (const entry of log) {
       if (seenIds.current.has(entry.id)) continue;
       seenIds.current.add(entry.id);
-      if (
-        entry.type === "public" &&
-        entry.tags.includes("game-event") &&
-        !entry.tags.includes("ability") &&
-        !entry.tags.includes("penalty")
-      ) {
+      if (entry.type === "public" && entry.tags.includes("game-event")) {
         latest = { id: entry.id, message: entry.message };
       }
     }
@@ -111,9 +112,9 @@ export const GameEventCaption = () => {
             <Icon className="h-3.5 w-3.5 shrink-0 text-ink-muted" />
             <span>{caption.message}</span>
           </motion.div>
-        ) : isFinalTurns && callerName ? (
+        ) : isLastLap ? (
           <motion.div
-            key="final-turns"
+            key="last-lap"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -121,7 +122,13 @@ export const GameEventCaption = () => {
             className="flex items-center gap-2 text-sm font-semibold text-ink-muted"
           >
             <Flag className="h-3.5 w-3.5 shrink-0" />
-            <span>Final turns. {callerName} called Check.</span>
+            <span>
+              Last cards.{" "}
+              {cardsRemaining === 1
+                ? "One throw left"
+                : `${cardsRemaining} throws left`}
+              . Whatever is still on the table scores for nobody.
+            </span>
           </motion.div>
         ) : null}
       </AnimatePresence>

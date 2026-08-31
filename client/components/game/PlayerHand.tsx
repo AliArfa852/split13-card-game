@@ -1,424 +1,119 @@
 "use client";
 
-import React from "react";
-import { useUISelector, type UIMachineSnapshot } from "@/context/GameUIContext";
-import { HandGrid } from "./HandGrid";
-import { type Player, type Card, GameStage } from "shared-types";
+import { useState } from "react";
+import { motion } from "framer-motion";
+import type { Card } from "shared-types";
+import { PlayingCard } from "@/components/cards/PlayingCard";
+import { cardTravelTransition } from "@/lib/card-motion";
+import { play } from "@/lib/sounds";
 import { cn } from "@/lib/utils";
-import { PlayingCard } from "../cards/PlayingCard";
-import { CardFlight } from "../cards/CardFlight";
-import { CARD_RING_GEOMETRY } from "../cards/cardRing";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import {
-  Eye,
-  ArrowLeftRight,
-  Equal,
-  Plus,
-  type LucideIcon,
-} from "lucide-react";
-
-/** Corner badge on a ringed card slot: surface chip, ink glyph. The icon
- *  distinguishes the action (eye = peek, arrows = swap); the ring color says
- *  whose it is (accent = yours, ink = informational). */
-const SlotBadge = ({ icon: Icon }: { icon: LucideIcon }) => (
-  <span className="absolute -top-2 -right-2 rounded-full border border-hairline bg-surface p-1 text-ink shadow-sm">
-    <Icon className="h-3 w-3" />
-  </span>
-);
 
 interface PlayerHandProps {
-  player: Player;
-  isLocalPlayer: boolean;
-  onCardClick: (cardIndex: number) => void;
+  hand: Card[];
+  /** Rank on top of the stack, or null when the table is empty. */
+  topRank: string | null;
+  canThrow: boolean;
+  onThrow: (cardId: string) => void;
   className?: string;
-  canInteract: boolean;
-  isLocked?: boolean;
-  selectedCardIndex?: number | null;
-  /** Position around the table; staggers the end-of-round reveal and the
-   *  deal ripple. */
-  tableIndex: number;
-  /** Dense seat: smaller cells and tighter grid, so a full table of
-   *  opponents fits a phone. The local player's own hand stays regular. */
-  dense?: boolean;
 }
 
-const selectContext = (state: UIMachineSnapshot) => {
-  const ability = state.context.currentAbilityContext;
-  return {
-    visibleCards: state.context.visibleCards,
-    abilityStage: ability?.stage ?? null,
-    selectedPeekTargets: ability?.selectedPeekTargets,
-    selectedSwapTargets: ability?.selectedSwapTargets,
-    publicPeek: state.context.currentGameState?.publicPeek ?? null,
-    publicSwap: state.context.currentGameState?.publicSwap ?? null,
-    publicPenalty: state.context.currentGameState?.publicPenalty ?? null,
-    serverClockOffset: state.context.serverClockOffset,
-    localPlayerId: state.context.localPlayerId,
-    gameStage: state.context.currentGameState?.gameStage ?? null,
-  };
-};
-
-const PlayerHand: React.FC<PlayerHandProps> = ({
-  player,
-  isLocalPlayer,
-  onCardClick,
+/**
+ * Your own thirteen cards, always face-up to you (rules §4) and sorted by
+ * rank so equal ranks sit together — the pairing that matters is the only
+ * thing you ever look for here.
+ *
+ * Laid out as an overlapping fan rather than a flat row: thirteen cards do
+ * not fit side by side on a phone, and the overlap is chosen so each card's
+ * rank corner stays visible even when its body is covered. The selected card
+ * lifts out of the fan so the one you are about to commit is unmistakable.
+ */
+export const PlayerHand = ({
+  hand,
+  topRank,
+  canThrow,
+  onThrow,
   className,
-  canInteract,
-  isLocked = false,
-  selectedCardIndex = null,
-  tableIndex,
-  dense = false,
-}) => {
-  const {
-    visibleCards,
-    abilityStage,
-    selectedPeekTargets,
-    selectedSwapTargets,
-    publicPeek,
-    publicSwap,
-    publicPenalty,
-    serverClockOffset,
-    localPlayerId,
-    gameStage,
-  } = useUISelector(selectContext);
-  // publicSwap is a momentary flash: show the rings for a few seconds after
-  // the swap, then drop them without waiting for a server clear. occurredAt
-  // is a SERVER timestamp — compare on the server's clock (via the tracked
-  // offset), otherwise a client whose clock runs ahead computes remaining<=0
-  // and never shows the ring at all (the "sometimes it works" bug).
-  const SWAP_RING_VISIBLE_MS = 4000;
-  const [expiredSwapAt, setExpiredSwapAt] = React.useState<number | null>(null);
-  React.useEffect(() => {
-    if (!publicSwap) return;
-    const remaining =
-      publicSwap.occurredAt +
-      SWAP_RING_VISIBLE_MS -
-      (Date.now() + serverClockOffset);
-    if (remaining <= 0) {
-      setExpiredSwapAt(publicSwap.occurredAt);
+}: PlayerHandProps) => {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleClick = (card: Card) => {
+    if (!canThrow) return;
+    if (selectedId === card.id) {
+      // Second click on the same card commits it. A card leaves your hand for
+      // good, so it takes two deliberate taps rather than one stray one.
+      play("click");
+      onThrow(card.id);
+      setSelectedId(null);
       return;
     }
-    const t = setTimeout(
-      () => setExpiredSwapAt(publicSwap.occurredAt),
-      remaining,
+    play("click");
+    setSelectedId(card.id);
+  };
+
+  if (hand.length === 0) {
+    return (
+      <div
+        className={cn(
+          "flex h-[clamp(4.5rem,12vh,7rem)] items-center justify-center text-xs font-semibold uppercase tracking-widest text-ink-muted",
+          className,
+        )}
+      >
+        No cards left
+      </div>
     );
-    return () => clearTimeout(t);
-  }, [publicSwap, serverClockOffset]);
-  const swapIndicatorLive =
-    !!publicSwap && expiredSwapAt !== publicSwap.occurredAt;
-
-  // Penalty highlight: same momentary-flash pattern as the swap ring — show
-  // WHERE a failed-match penalty card landed for a few seconds, on the server
-  // clock, then drop it.
-  const PENALTY_RING_VISIBLE_MS = 4000;
-  const [expiredPenaltyAt, setExpiredPenaltyAt] = React.useState<number | null>(
-    null,
-  );
-  React.useEffect(() => {
-    if (!publicPenalty) return;
-    const remaining =
-      publicPenalty.occurredAt +
-      PENALTY_RING_VISIBLE_MS -
-      (Date.now() + serverClockOffset);
-    if (remaining <= 0) {
-      setExpiredPenaltyAt(publicPenalty.occurredAt);
-      return;
-    }
-    const t = setTimeout(
-      () => setExpiredPenaltyAt(publicPenalty.occurredAt),
-      remaining,
-    );
-    return () => clearTimeout(t);
-  }, [publicPenalty, serverClockOffset]);
-  const penaltyIndicatorLive =
-    !!publicPenalty && expiredPenaltyAt !== publicPenalty.occurredAt;
-
-  // SCORING/GAMEOVER broadcasts reveal every hand; the reveal now happens ON
-  // the table — cards flip in place in a ripple (tableIndex*180 +
-  // cardIndex*60ms) after the 1.1s settle hold, replacing the old sheet's
-  // RevealCard cascade.
-  const isEndStage =
-    gameStage === GameStage.SCORING || gameStage === GameStage.GAMEOVER;
-  const reducedMotion = !!useReducedMotion();
-  const [revealed, setRevealed] = React.useState<ReadonlySet<number>>(
-    () => new Set(),
-  );
-  React.useEffect(() => {
-    if (!isEndStage) {
-      setRevealed(new Set());
-      return;
-    }
-    if (reducedMotion) {
-      setRevealed(new Set(player.hand.map((_, i) => i)));
-      return;
-    }
-    const timers = player.hand.map((_, i) =>
-      setTimeout(
-        () =>
-          setRevealed((prev) => {
-            const next = new Set(prev);
-            next.add(i);
-            return next;
-          }),
-        1100 + tableIndex * 180 + i * 60,
-      ),
-    );
-    return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEndStage, reducedMotion, player.hand.length, tableIndex]);
-
-  // Deal ripple: only the commit that swaps DEALING -> INITIAL_PEEK mounts
-  // the hand cells, and only that commit gets per-card layout delays (a
-  // dealer's sweep: tableIndex*80 + cardIndex*40ms). Interrupted flights
-  // never carry a delay — the R11 projection-timing concern (findings §5.4)
-  // applied to delays on live flights, not on mount-time ones; the WAAPI
-  // class itself was closed by motion 12.42.2.
-  const prevStageRef = React.useRef(gameStage);
-  const dealtThisCommit =
-    prevStageRef.current === GameStage.DEALING &&
-    gameStage === GameStage.INITIAL_PEEK;
-  React.useEffect(() => {
-    prevStageRef.current = gameStage;
-  });
-
-  const handToDisplay =
-    isLocalPlayer && !isEndStage
-      ? player.hand.map((card) =>
-          card === null ? null : { facedown: true as const, id: card.id },
-        )
-      : player.hand;
-
-  // Opponents sit across the table: rotate their grid 180° (row-major
-  // reversal) so their bottom peek row reads at the top of your screen,
-  // like a real table. `index` stays the ORIGINAL hand index — peek rings,
-  // visibleCards and click targets all key off the server-side index.
-  const handEntries = handToDisplay.map((card, index) => ({ card, index }));
-  const displayEntries = isLocalPlayer
-    ? handEntries
-    : [...handEntries].reverse();
-
-  // Everyone is looking at their bottom two cards right now; show opponents
-  // which slots those are (real-life parity: you see the cards being lifted).
-  const initialPeekActive =
-    gameStage === GameStage.INITIAL_PEEK &&
-    visibleCards.some((vc) => vc.source === "initial-peek");
-
-  const combinedClass = cn(
-    isLocked && "opacity-60",
-    dense && "gap-1",
-    className,
-  );
+  }
 
   return (
-    <HandGrid numItems={handToDisplay.length} className={combinedClass}>
-      {displayEntries.map(({ card, index }) => {
-        // An empty slot: a hairline-outlined placeholder, no card, no motion,
-        // keyed by position so it never animates and never takes a click.
-        if (card === null) {
-          return (
-            <div
-              key={`slot-${index}`}
-              aria-hidden
-              className={cn(
-                "relative aspect-[5/7]",
-                dense
-                  ? "w-[min(6.5svh,9.5vw,3.5rem)] tiny:w-[min(5.5svh,9.5vw,3.5rem)] @4xl:w-[min(8svh,11.5vw)]"
-                  : "w-[min(8svh,15vw)] tiny:w-[min(7svh,15vw)]",
-              )}
-            >
-              <div className="absolute inset-0 rounded-card border border-hairline" />
-            </div>
-          );
-        }
-
-        const isCardVisible = visibleCards.some(
-          (vc) => vc.playerId === player.id && vc.cardIndex === index,
-        );
-
-        const visibleCardData = isCardVisible
-          ? visibleCards.find(
-              (vc) => vc.playerId === player.id && vc.cardIndex === index,
-            )?.card
-          : undefined;
-
-        let cardToRender: Card | { facedown: true; id: string } = card;
-
-        if (isCardVisible) {
-          cardToRender = visibleCardData || player.hand[index]!;
-        }
-        const isFaceUp =
-          "rank" in cardToRender && (!isEndStage || revealed.has(index));
-
-        const isMatchSelected = selectedCardIndex === index;
-        const isAbilityPeekSelected =
-          abilityStage === "peeking" &&
-          !!selectedPeekTargets?.some(
-            (t) => t.playerId === player.id && t.cardIndex === index,
-          );
-        const isAbilitySwapSelected =
-          abilityStage === "swapping" &&
-          !!selectedSwapTargets?.some(
-            (t) => t.playerId === player.id && t.cardIndex === index,
-          );
-        const isSelected =
-          isMatchSelected || isAbilityPeekSelected || isAbilitySwapSelected;
-
-        // Someone else's confirmed ability peek on this slot — everyone sees
-        // WHICH card is being looked at, never its face. The server clears
-        // publicPeek (and re-broadcasts) when the peek window ends.
-        const isPeekedByOther =
-          !!publicPeek &&
-          publicPeek.peekerId !== localPlayerId &&
-          publicPeek.targets.some(
-            (t) => t.playerId === player.id && t.cardIndex === index,
-          );
-        const showPeekIndicator =
-          isPeekedByOther ||
-          (initialPeekActive &&
-            !isLocalPlayer &&
-            index >= handToDisplay.length - 2);
-
-        // Someone else's just-confirmed ability swap touched this slot —
-        // everyone sees WHICH two cards traded places, never their faces.
-        const showSwapIndicator =
-          swapIndicatorLive &&
-          publicSwap!.swapperId !== localPlayerId &&
-          publicSwap!.targets.some(
-            (t) => t.playerId === player.id && t.cardIndex === index,
-          );
-
-        // A failed-match penalty card just landed in this slot — everyone
-        // (including the penalized player) sees WHERE the new card went, never
-        // its face.
-        const showPenaltyIndicator =
-          penaltyIndicatorLive &&
-          publicPenalty!.playerId === player.id &&
-          publicPenalty!.cardIndex === index;
-
-        return (
-          <div
-            key={card.id}
-            className={cn(
-              "relative aspect-[5/7]",
-              // svh, not vh: stable while mobile browser chrome collapses.
-              // Dense cells trade size for fitting six seats on a phone —
-              // their taps are occasional (ability targeting), not constant.
-              // The 3.5rem cap is for mid-width portrait tablets; at @4xl a
-              // full row fits anyway and the cap lifts, so desktop and
-              // half-screen sizes are unchanged.
-              dense
-                ? "w-[min(6.5svh,9.5vw,3.5rem)] tiny:w-[min(5.5svh,9.5vw,3.5rem)] @4xl:w-[min(8svh,11.5vw)]"
-                : "w-[min(8svh,15vw)] tiny:w-[min(7svh,15vw)]",
-            )}
-          >
-            {/* No whileHover here: this is the layoutId projection node, and
-                a hover pose on it fights the flight projection for the same
-                transform (the Gecko skip/stuck-pose class). The brightness
-                cue in the classes is the hover feedback. */}
-            <CardFlight
-              key={card.id}
-              layoutId={card.id}
-              transition={
-                dealtThisCommit && !reducedMotion
-                  ? {
-                      layout: {
-                        type: "tween",
-                        duration: 0.65,
-                        ease: [0.55, 0.06, 0.19, 0.98],
-                        delay: (tableIndex * 80 + index * 40) / 1000,
-                      },
-                    }
-                  : undefined
-              }
-              className={cn(
-                "absolute inset-0 rounded-card",
-                "data-[interactive=true]:cursor-pointer",
-                "data-[interactive=true]:hover:filter-[brightness(1.15)]",
-              )}
-              data-interactive={canInteract && !isLocked}
-              onClick={() => canInteract && !isLocked && onCardClick?.(index)}
-            >
-              <AnimatePresence>
-                {/* Your own selection — accent ring; the badge icon (eye =
-                    peek, arrows = swap, equals = match) says which action,
-                    never the hue. The near-white ring-offset casing keeps the
-                    accent ring legible on a red card back (bg-accent) — without
-                    it, red-on-red made the selection invisible. */}
-                {isSelected && (
-                  <motion.div
-                    key="sel-ring"
-                    className={cn(
-                      CARD_RING_GEOMETRY,
-                      // Layered casing: a 2px near-white (accent-ink) band hugs
-                      // the card edge, then a 3px accent band beyond it. The
-                      // white separator is what makes the accent ring legible on
-                      // a red card back (plain ring-accent was red-on-red).
-                      "shadow-[0_0_0_2px_hsl(var(--accent-ink)),0_0_0_5px_hsl(var(--accent))]",
-                    )}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.15, ease: "easeOut" }}
-                  >
-                    {isMatchSelected && <SlotBadge icon={Equal} />}
-                    {isAbilityPeekSelected && <SlotBadge icon={Eye} />}
-                    {isAbilitySwapSelected && (
-                      <SlotBadge icon={ArrowLeftRight} />
-                    )}
-                  </motion.div>
+    <div className={cn("flex flex-col items-center gap-2", className)}>
+      <div className="flex w-full max-w-3xl items-end justify-center overflow-x-auto px-4 pb-1 pt-6">
+        <div className="flex items-end">
+          {hand.map((card, i) => {
+            const isSelected = selectedId === card.id;
+            const wouldCapture = topRank !== null && card.rank === topRank;
+            return (
+              <motion.button
+                key={card.id}
+                layoutId={`card-${card.id}`}
+                transition={cardTravelTransition.layout}
+                type="button"
+                onClick={() => handleClick(card)}
+                disabled={!canThrow}
+                animate={{ y: isSelected ? -18 : 0 }}
+                whileHover={canThrow ? { y: -10 } : undefined}
+                aria-label={`${card.rank} of ${card.suit}${
+                  wouldCapture ? " — captures the table" : ""
+                }`}
+                aria-pressed={isSelected}
+                className={cn(
+                  "relative h-[clamp(4.5rem,12vh,7rem)] w-[clamp(3.2rem,8.6vh,5rem)] shrink-0 rounded-card transition-shadow",
+                  // The overlap. Negative margin on every card but the first
+                  // keeps the rank corner of the one underneath visible.
+                  i > 0 && "-ml-[clamp(1.4rem,3.6vh,2.1rem)]",
+                  canThrow ? "cursor-pointer" : "cursor-default",
+                  isSelected && "z-20 drop-shadow-lg",
+                  // A card that would capture is worth pointing at, since
+                  // spotting it is the whole skill of the game.
+                  wouldCapture &&
+                    canThrow &&
+                    "ring-2 ring-accent ring-offset-2 ring-offset-ground rounded-card",
                 )}
-                {/* Someone else's peek — informational ink ring + eye badge. */}
-                {showPeekIndicator && (
-                  <motion.div
-                    key="peek-indicator"
-                    className={cn(CARD_RING_GEOMETRY, "ring-[2px] ring-ink")}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                  >
-                    <SlotBadge icon={Eye} />
-                  </motion.div>
-                )}
-                {/* Someone else's swap — informational ink ring + arrows badge. */}
-                {showSwapIndicator && (
-                  <motion.div
-                    key="swap-indicator"
-                    className={cn(CARD_RING_GEOMETRY, "ring-[2px] ring-ink")}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                  >
-                    <SlotBadge icon={ArrowLeftRight} />
-                  </motion.div>
-                )}
-                {/* A penalty card just landed here — informational ink ring +
-                    plus badge, shown to everyone (a card was added). */}
-                {showPenaltyIndicator && (
-                  <motion.div
-                    key="penalty-indicator"
-                    className={cn(CARD_RING_GEOMETRY, "ring-[2px] ring-ink")}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                  >
-                    <SlotBadge icon={Plus} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              <PlayingCard
-                card={isFaceUp ? (cardToRender as Card) : undefined}
-                faceDown={!isFaceUp}
-                className="h-full w-full"
-              />
-            </CardFlight>
-          </div>
-        );
-      })}
-    </HandGrid>
+                style={{ zIndex: isSelected ? 30 : i }}
+                data-cursor-link
+              >
+                <PlayingCard card={card} className="h-full w-full" />
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className="h-4 text-center text-xs font-semibold text-ink-muted">
+        {!canThrow
+          ? ""
+          : selectedId
+            ? "Tap again to throw it"
+            : "Tap a card to pick it"}
+      </p>
+    </div>
   );
 };
-
-export default PlayerHand;

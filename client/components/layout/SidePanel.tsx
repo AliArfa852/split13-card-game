@@ -20,6 +20,7 @@ import {
   useUISelector,
   type UIMachineSnapshot,
 } from "@/context/GameUIContext";
+import { Team } from "shared-types";
 import { cn } from "@/lib/utils";
 
 const MAX_CHAT_MESSAGE_LENGTH = 500;
@@ -34,9 +35,9 @@ const selectSidePanelProps = (state: UIMachineSnapshot) => ({
   chat: state.context.currentGameState?.chat,
   localPlayerId: state.context.localPlayerId,
   players: state.context.currentGameState?.players,
-  turnOrder: state.context.currentGameState?.turnOrder,
-  playerWins: state.context.currentGameState?.playerWins,
-  playerTotals: state.context.currentGameState?.playerTotals,
+  seats: state.context.currentGameState?.seats,
+  teamWins: state.context.currentGameState?.teamWins,
+  teamScores: state.context.currentGameState?.teamScores,
   roundEpoch: state.context.currentGameState?.roundEpoch,
 });
 
@@ -104,9 +105,9 @@ export const SidePanel = () => {
     chat,
     localPlayerId,
     players,
-    turnOrder,
-    playerWins,
-    playerTotals,
+    seats,
+    teamWins,
+    teamScores,
     roundEpoch,
   } = useUISelector(selectSidePanelProps);
   const [draft, setDraft] = useState("");
@@ -152,25 +153,23 @@ export const SidePanel = () => {
     setDraft("");
   };
 
-  // Same order as the end screen's block, so the two read as one board at two
-  // densities: wins first, the lower total separating equal wins. Seat order
-  // settles the rest, which is the whole table in round one and is why this
-  // list does not reshuffle itself every time a broadcast arrives.
-  const standing = useMemo(() => {
-    const wins = playerWins ?? {};
-    const totals = playerTotals ?? {};
-    const seat = (id: string) => {
-      const i = (turnOrder ?? []).indexOf(id);
-      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-    };
-    return Object.values(players ?? {}).sort(
-      (a, b) =>
-        (wins[b.id] ?? 0) - (wins[a.id] ?? 0) ||
-        (totals[a.id] ?? 0) - (totals[b.id] ?? 0) ||
-        seat(a.id) - seat(b.id),
-    );
-  }, [players, turnOrder, playerWins, playerTotals]);
-  const scored = standing.some((p) => (playerWins?.[p.id] ?? 0) > 0);
+  // Split 13 scores by team, not by player, so the standing is two rows and
+  // never reorders: Team A is always first. Each row carries who is in it,
+  // since a partner is the one thing a player has to keep track of.
+  const standing = useMemo(
+    () =>
+      [Team.A, Team.B].map((team) => ({
+        team,
+        wins: teamWins?.[team] ?? 0,
+        score: teamScores?.[team] ?? 0,
+        // Seat order, so partners always read as "seat 1 & 3" / "seat 2 & 4".
+        members: (seats ?? [])
+          .map((id) => (id ? players?.[id] : null))
+          .filter((p): p is NonNullable<typeof p> => !!p && p.team === team),
+      })),
+    [players, seats, teamWins, teamScores],
+  );
+  const scored = standing.some((row) => row.wins > 0 || row.score > 0);
 
   // Group consecutive same-sender messages within two minutes: one timestamp
   // per group, on its last message.
@@ -269,14 +268,14 @@ export const SidePanel = () => {
                   in a long session this is the only way to tell round three
                   from round eleven. */}
               <p className="text-sm font-bold text-ink">
-                Round {(roundEpoch ?? 0) + 1}
+                Hand {(roundEpoch ?? 0) + 1}
               </p>
               {/* Only while every column is a zero. The table already says who
                   is here; this says why it has nothing in it yet, which a
                   column of zeroes on its own reads as a bug. */}
               {!scored && (
                 <p className="mt-0.5 text-xs text-ink-muted">
-                  Fills in as rounds are scored.
+                  Fills in as cards are captured.
                 </p>
               )}
               {/* Same columns as the end screen's block, in the same order, so
@@ -284,30 +283,39 @@ export const SidePanel = () => {
                   zeros and all: a table of names with nothing won yet still
                   says who is here and what it will fill in. */}
               <div className="mt-3 flex items-baseline gap-3 text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
-                <span className="w-4 shrink-0" aria-hidden />
-                <span className="min-w-0 flex-1">Player</span>
-                <span className="w-10 shrink-0 text-right">Wins</span>
-                <span className="w-12 shrink-0 text-right">Total</span>
+                <span className="min-w-0 flex-1">Team</span>
+                <span className="w-12 shrink-0 text-right">Hands</span>
+                <span className="w-12 shrink-0 text-right">Points</span>
               </div>
               <div className="divide-y divide-hairline">
-                {standing.map((player, i) => (
-                  <div key={player.id} className="flex items-center gap-3 py-2">
-                    <span className="w-4 shrink-0 text-sm font-semibold tabular-nums text-ink-muted">
-                      {i + 1}
+                {standing.map((row) => (
+                  <div key={row.team} className="flex items-center gap-3 py-2">
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={cn(
+                          "text-sm font-bold",
+                          row.team === Team.A ? "text-team-a" : "text-team-b",
+                        )}
+                      >
+                        Team {row.team}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-ink-muted">
+                        {row.members.length
+                          ? row.members
+                              .map(
+                                (m) =>
+                                  m.name +
+                                  (m.id === localPlayerId ? " (you)" : ""),
+                              )
+                              .join(" · ")
+                          : "Empty"}
+                      </span>
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
-                      {player.name}
-                      {player.id === localPlayerId && (
-                        <span className="ml-1.5 text-xs font-normal text-ink-muted">
-                          (you)
-                        </span>
-                      )}
-                    </span>
-                    <span className="w-10 shrink-0 text-right text-sm font-semibold tabular-nums text-ink-muted">
-                      {playerWins?.[player.id] ?? 0}
+                    <span className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums text-ink-muted">
+                      {row.wins}
                     </span>
                     <span className="w-12 shrink-0 text-right text-sm font-bold tabular-nums text-ink">
-                      {playerTotals?.[player.id] ?? 0}
+                      {row.score}
                     </span>
                   </div>
                 ))}

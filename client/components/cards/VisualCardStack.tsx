@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { PublicCard } from "shared-types";
+import { Card } from "shared-types";
 import { PlayingCard } from "./PlayingCard";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
@@ -11,9 +11,9 @@ import { Equal, Lock } from "lucide-react";
 interface VisualCardStackProps {
   title: string;
   count: number;
-  topCard?: PublicCard | null;
+  topCard?: Card | null;
   /** Card revealed underneath when the top card animates away. */
-  secondCard?: PublicCard | null;
+  secondCard?: Card | null;
   faceDown?: boolean;
   canInteract?: boolean;
   onClick?: () => void;

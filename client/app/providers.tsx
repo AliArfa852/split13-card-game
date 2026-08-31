@@ -17,12 +17,10 @@ import { useEffect, useRef } from "react";
 import { createActor } from "xstate";
 import {
   SocketEventName,
-  type Card,
   type ChatMessage,
-  type ClientCheckGameState,
+  type ClientSplitGameState,
   type ClientToServerEvents,
   type RichGameLogMessage,
-  type ServerToClientEvents,
 } from "shared-types";
 import { DeviceProvider } from "@/context/DeviceContext";
 
@@ -31,9 +29,6 @@ import { DeviceProvider } from "@/context/DeviceContext";
 // server side surfaces here as a type error instead of being absorbed.
 type PlayerActionPayload = Parameters<
   ClientToServerEvents[SocketEventName.PLAYER_ACTION]
->[0];
-type AbilityPeekResultPayload = Parameters<
-  ServerToClientEvents[SocketEventName.ABILITY_PEEK_RESULT]
 >[0];
 
 // ============================================================================
@@ -72,7 +67,7 @@ function UIMachineEffects({ actor }: { actor: UIMachineActorRef }) {
     });
 
     // Socket → Actor bridges
-    const gs = (g: ClientCheckGameState) => {
+    const gs = (g: ClientSplitGameState) => {
       lastStateAt.current = Date.now();
       actor.send({ type: "CLIENT_GAME_STATE_UPDATED", gameState: g });
     };
@@ -80,10 +75,6 @@ function UIMachineEffects({ actor }: { actor: UIMachineActorRef }) {
       actor.send({ type: "NEW_GAME_LOG", logMessage: m });
     const cm = (m: ChatMessage) =>
       actor.send({ type: "NEW_CHAT_MESSAGE", chatMessage: m });
-    const pk = (d: { hand: Card[] }) =>
-      actor.send({ type: "INITIAL_PEEK_INFO", hand: d.hand });
-    const pr = (d: AbilityPeekResultPayload) =>
-      actor.send({ type: "ABILITY_PEEK_RESULT", results: d.results });
     const er = (e: { message: string }) =>
       actor.send({ type: "ERROR_RECEIVED", error: e.message });
     const sce = () => actor.send({ type: "SEAT_CLAIMED_ELSEWHERE" });
@@ -118,8 +109,6 @@ function UIMachineEffects({ actor }: { actor: UIMachineActorRef }) {
     socket.on(SocketEventName.GAME_STATE_UPDATE, gs);
     socket.on(SocketEventName.SERVER_LOG_ENTRY, lg);
     socket.on(SocketEventName.NEW_CHAT_MESSAGE, cm);
-    socket.on(SocketEventName.INITIAL_PEEK_INFO, pk);
-    socket.on(SocketEventName.ABILITY_PEEK_RESULT, pr);
     socket.on(SocketEventName.ERROR_MESSAGE, er);
     socket.on(SocketEventName.SEAT_CLAIMED_ELSEWHERE, sce);
     socket.on(SocketEventName.INITIAL_LOGS, il);
@@ -146,8 +135,6 @@ function UIMachineEffects({ actor }: { actor: UIMachineActorRef }) {
       socket.off(SocketEventName.GAME_STATE_UPDATE, gs);
       socket.off(SocketEventName.SERVER_LOG_ENTRY, lg);
       socket.off(SocketEventName.NEW_CHAT_MESSAGE, cm);
-      socket.off(SocketEventName.INITIAL_PEEK_INFO, pk);
-      socket.off(SocketEventName.ABILITY_PEEK_RESULT, pr);
       socket.off(SocketEventName.ERROR_MESSAGE, er);
       socket.off(SocketEventName.SEAT_CLAIMED_ELSEWHERE, sce);
       socket.off(SocketEventName.INITIAL_LOGS, il);

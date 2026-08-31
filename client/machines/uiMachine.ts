@@ -313,7 +313,7 @@ export const uiMachine = setup({
       reconnectToken: undefined,
       currentGameState: undefined,
 
-          reconnectionAttempts: 0,
+      reconnectionAttempts: 0,
       pendingActionSince: null,
     }),
     armColdStartPhases: enqueueActions(({ enqueue }) => {
@@ -402,10 +402,6 @@ export const uiMachine = setup({
       isSidePanelOpen: ({ context }) => !context.isSidePanelOpen,
     }),
 
-
-
-
-
     resetReconnectionAttempts: assign({ reconnectionAttempts: 0 }),
     dismissModal: assign({ modal: null }),
     redirectToHome: () => {
@@ -478,9 +474,7 @@ export const uiMachine = setup({
       },
     ),
   },
-  guards: {
-
-  },
+  guards: {},
 }).createMachine({
   id: "ui",
   context: ({ input }) => ({
@@ -488,9 +482,9 @@ export const uiMachine = setup({
     gameId: input.gameId,
     reconnectToken: input.reconnectToken,
     currentGameState: undefined,
-      isSidePanelOpen: false,
+    isSidePanelOpen: false,
     reconnectionAttempts: 0,
-      serverClockOffset: 0,
+    serverClockOffset: 0,
     lastStateReceivedAt: 0,
     modal: null,
     pendingActionSince: null,
@@ -564,7 +558,10 @@ export const uiMachine = setup({
             src: "createGame",
             input: ({ event }) => {
               assertEvent(event, "CREATE_GAME_REQUESTED");
-              return { name: event.playerName, botDifficulty: event.botDifficulty };
+              return {
+                name: event.playerName,
+                botDifficulty: event.botDifficulty,
+              };
             },
             onDone: {
               target: "idle",
@@ -799,7 +796,7 @@ export const uiMachine = setup({
                       event.output.gameState?.serverNow,
                     ),
                   reconnectionAttempts: 0,
-                                }),
+                }),
                 enqueueActions(({ event, enqueue }) => {
                   if (event.output.logs && event.output.logs.length > 0) {
                     enqueue.raise({

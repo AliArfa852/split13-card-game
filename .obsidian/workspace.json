@@ -190,6 +190,10 @@
   },
   "active": "615fa513998f5b63",
   "lastOpenFiles": [
+    "client/components/game/sedwBf2gl",
+    "client/components/game/PlayerSeat.tsx",
+    "client/components/game/TeamScoreboard.tsx",
+    "client/components/game/TurnTimer.tsx",
     "currenttask.md",
     "client/tsconfig.tsbuildinfo",
     "server/tsconfig.tsbuildinfo",
@@ -198,9 +202,6 @@
     "server/dist/index.js.map",
     "server/dist/state-redactor.d.ts",
     "server/dist/state-redactor.js",
-    "server/dist/state-redactor.js.map",
-    "server/dist/game-machine.d.ts",
-    "server/dist/game-machine.js",
     "node_modules/eslint-module-utils/node_modules/debug/CHANGELOG.md",
     "node_modules/@typescript-eslint/scope-manager/README.md",
     "node_modules/lightningcss-linux-x64-gnu/README.md"

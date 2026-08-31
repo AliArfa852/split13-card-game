@@ -10,6 +10,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useUIActorRef, useUISelector } from "@/context/GameUIContext";
+import { BotDifficulty } from "shared-types";
+
+const BOT_DIFFICULTY_OPTIONS = [
+  { value: BotDifficulty.EASY, label: "Easy" },
+  { value: BotDifficulty.NORMAL, label: "Normal" },
+  { value: BotDifficulty.HARD, label: "Hard" },
+] as const;
 import { ColdStartWaitNotice } from "@/components/modals/ColdStartWaitNotice";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +36,9 @@ export function NewGameModal({
     }
     return "";
   });
-  const [maxPlayers, setMaxPlayers] = useState(4);
+  const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>(
+    BotDifficulty.NORMAL,
+  );
 
   const { send } = useUIActorRef();
   // Loading state lives in the machine, so a failed request re-enables the
@@ -42,7 +51,7 @@ export function NewGameModal({
       return;
     }
     localStorage.setItem("localPlayerName", playerName);
-    send({ type: "CREATE_GAME_REQUESTED", playerName, maxPlayers });
+    send({ type: "CREATE_GAME_REQUESTED", playerName, botDifficulty });
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -96,34 +105,35 @@ export function NewGameModal({
         </div>
 
         <div className="mt-6">
-          <span className="text-sm font-semibold text-ink">Seats</span>
+          <span className="text-sm font-semibold text-ink">Bot difficulty</span>
           <div
             className="mt-2 flex gap-2"
             role="radiogroup"
-            aria-label="Table size"
+            aria-label="Bot difficulty"
           >
             {/* Selection is ink-filled, not accent: the Create pill stays the
                 one accent action on this sheet. */}
-            {[2, 3, 4, 5, 6].map((n) => (
+            {BOT_DIFFICULTY_OPTIONS.map(({ value, label }) => (
               <button
-                key={n}
+                key={value}
                 type="button"
                 role="radio"
-                aria-checked={n === maxPlayers}
-                onClick={() => setMaxPlayers(n)}
+                aria-checked={value === botDifficulty}
+                onClick={() => setBotDifficulty(value)}
                 className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold transition-colors",
-                  n === maxPlayers
+                  "flex h-10 flex-1 items-center justify-center rounded-full border text-sm font-bold transition-colors",
+                  value === botDifficulty
                     ? "border-ink bg-ink text-ground"
                     : "border-hairline bg-surface text-ink-muted hover:text-ink",
                 )}
               >
-                {n}
+                {label}
               </button>
             ))}
           </div>
           <p className="mt-2 text-xs text-ink-muted">
-            A game can start once two players are seated.
+            Split 13 is always four seats. Any seat still empty when you start
+            is filled by a bot at this difficulty.
           </p>
         </div>
 

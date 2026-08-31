@@ -59,6 +59,11 @@
   --hairline: 36 15% 78%;
   --accent: 4 60% 51%;
   --accent-ink: 30 100% 98%;
+  /* The two teams. Blue vs amber rather than two hues near the red accent:
+     it is the safest pair for colour-blind viewers, and neither reads as
+     "the accent" when a card or button is next to it. */
+  --team-a: 199 76% 38%;
+  --team-b: 28 82% 46%;
 
   /* Elevation — tokened so shadows adapt per theme (a fixed black shadow was
      invisible on dark yet harsh on light). Framer can't tween a var()-based
@@ -112,6 +117,8 @@
   --hairline: 0 0% 23%;
   --accent: 2 52% 48%;
   --accent-ink: 23 100% 97%;
+  --team-a: 199 70% 55%;
+  --team-b: 32 85% 58%;
 
   /* A black shadow reads as nothing on the near-black ground; deepen it so a
      lifted card still separates from the table in dark. Rest shares the black
@@ -142,6 +149,8 @@
   --color-hairline: hsl(var(--hairline));
   --color-accent: hsl(var(--accent));
   --color-accent-ink: hsl(var(--accent-ink));
+  --color-team-a: hsl(var(--team-a));
+  --color-team-b: hsl(var(--team-b));
 
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));

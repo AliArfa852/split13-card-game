@@ -1,408 +1,267 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  useUISelector,
+  GameStage,
+  PlayerActionType,
+  SEAT_COUNT,
+  Team,
+  type Player,
+} from "shared-types";
+import {
   useUIActorRef,
+  useUISelector,
   type UIMachineSnapshot,
 } from "@/context/GameUIContext";
-import { TableArea } from "./TableArea";
-import PlayerHandStrip from "./PlayerHandStrip";
-import { GameStage, PlayerActionType, type PublicCard } from "shared-types";
-import { cn } from "@/lib/utils";
-import { ActionController } from "./ActionController";
-import { ActionControllerView } from "./ActionControllerView";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { RoundSummary } from "./RoundSummary";
 import { GameHeader } from "./GameHeader";
-import SidePanel from "@/components/layout/SidePanel";
-import { useMediaQuery } from "@/hooks/use-media-query";
-import { useCheckMoment, CheckStamp } from "./CheckMoment";
-import { usePenaltyMoment, PenaltyStamp } from "./PenaltyMoment";
-import { useAbilityMoment, AbilityStamp } from "./AbilityMoment";
-import { useMatchMoment, MatchStamp } from "./MatchMoment";
 import { GameEventCaption } from "./GameEventCaption";
+import { PlayerSeat } from "./PlayerSeat";
+import { PlayerHand } from "./PlayerHand";
+import { TableArea } from "./TableArea";
+import { TeamScoreboard } from "./TeamScoreboard";
+import { TurnTimer } from "./TurnTimer";
+import SidePanel from "@/components/layout/SidePanel";
+import { cn } from "@/lib/utils";
 
-const selectIsDisconnected = (state: UIMachineSnapshot) =>
-  state.matches({ inGame: "disconnected" });
-const selectIsReconnecting = (state: UIMachineSnapshot) =>
-  state.matches({ inGame: "reconnecting" });
-
-const selectGameBoardProps = (state: UIMachineSnapshot) => {
-  const { currentGameState: gameState, localPlayerId } = state.context;
-  const playerWithPendingCard = Object.values(gameState?.players ?? {}).find(
-    (p) => p.pendingDrawnCard,
-  );
-
+const selectBoard = (state: UIMachineSnapshot) => {
+  const gs = state.context.currentGameState;
   return {
-    gameState: gameState,
-    localPlayerId: localPlayerId,
-    playerWithPendingCard: playerWithPendingCard,
-    isMyTurn: gameState?.currentPlayerId === localPlayerId,
-    localPlayerForfeited:
-      !!localPlayerId && !!gameState?.players[localPlayerId]?.forfeited,
+    localPlayerId: state.context.localPlayerId ?? null,
+    players: gs?.players ?? null,
+    seats: gs?.seats ?? null,
+    currentPlayerId: gs?.currentPlayerId ?? null,
+    stack: gs?.stack ?? null,
+    stackValue: gs?.stackValue ?? 0,
+    teamScores: gs?.teamScores ?? null,
+    cardsRemaining: gs?.cardsRemaining ?? 0,
+    turnDeadline: gs?.turnDeadline ?? null,
+    turnTimerMs: gs?.turnTimerMs ?? 20000,
+    gameStage: gs?.gameStage ?? null,
+    result: gs?.result ?? null,
+    teamWins: gs?.teamWins ?? null,
+    rematchVotes: gs?.rematchVotes ?? null,
+    hostId: gs?.hostId ?? null,
+    serverClockOffset: state.context.serverClockOffset,
   };
 };
 
-const selectGameEndProps = (state: UIMachineSnapshot) => {
-  const gameState = state.context.currentGameState;
-  const fallbackWinner = gameState?.winnerId ? [gameState.winnerId] : [];
-  return {
-    gameStage: gameState?.gameStage,
-    players: Object.values(gameState?.players ?? {}),
-    winnerIds: gameState?.gameover?.winnerIds ?? fallbackWinner,
-  };
-};
+/** Seat positions relative to the viewer, who always sits at the bottom.
+ *  Play is clockwise, which from the viewer's chair runs bottom → left → top
+ *  → right, so the seat that acts after you is on your left and your partner
+ *  (two seats along, therefore same team) is opposite you. */
+const relativeSeats = (mySeat: number) => ({
+  left: (mySeat + 1) % SEAT_COUNT,
+  top: (mySeat + 2) % SEAT_COUNT,
+  right: (mySeat + 3) % SEAT_COUNT,
+});
 
-const ConnectionStatusBanner = () => {
-  const isDisconnected = useUISelector(selectIsDisconnected);
-  const isReconnecting = useUISelector(selectIsReconnecting);
-  if (!isDisconnected && !isReconnecting) return null;
-  return (
-    <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-accent text-accent-ink px-4 py-2 rounded-pill z-50">
-      {isReconnecting ? "Reconnecting..." : "Connection Lost"}
-    </div>
-  );
-};
-
-const GameStateError = ({
-  hasPlayers,
-  hasGameState,
-}: {
-  hasPlayers: boolean | undefined;
-  hasGameState: boolean;
-}) => {
-  if (hasPlayers || !hasGameState) return null;
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-ink/50 z-50">
-      <div className="bg-surface text-ink p-4 rounded-card border border-hairline shadow-lg">
-        <h3 className="font-bold">Game State Error</h3>
-        <p className="text-ink-muted">
-          Could not load player data. Please refresh the page.
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const LoadingIndicator = () => (
-  <div className="flex items-center justify-center h-screen w-full bg-ground">
-    <p className="font-game text-ink-muted">Loading Game...</p>
-  </div>
-);
-
-// Shown to a player whose seat was forfeited after a failed reconnect: the
-// board underneath is real but locked for them, which otherwise reads as a
-// silent hardstuck. Dismissible so they can spectate instead.
-const ForfeitNotice = ({ onLeave }: { onLeave: () => void }) => {
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
-  return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-ground/80 p-4">
-      <div className="flex max-w-sm flex-col items-center gap-4 rounded-2xl border border-hairline bg-surface p-8 text-center">
-        <h3 className="text-2xl font-extrabold text-ink">
-          You forfeited this round
-        </h3>
-        <p className="text-sm text-ink-muted">
-          You were disconnected for too long, so your seat was forfeited. You
-          can keep watching, or head home.
-        </p>
-        <button
-          onClick={onLeave}
-          className="rounded-full bg-accent px-6 py-2.5 text-sm font-bold text-accent-ink hover:bg-accent/90"
-        >
-          Back to Home
-        </button>
-        <button
-          onClick={() => setDismissed(true)}
-          className="text-xs font-semibold text-ink-muted underline underline-offset-4 hover:text-ink"
-        >
-          Keep watching
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export function GameBoard() {
+export const GameBoard = () => {
   const { send } = useUIActorRef();
-  const {
-    gameState,
-    localPlayerId,
-    playerWithPendingCard,
-    isMyTurn,
-    localPlayerForfeited,
-  } = useUISelector(selectGameBoardProps);
-  const { gameStage, players, winnerIds } = useUISelector(selectGameEndProps);
-  const checkMoment = useCheckMoment();
-  const penaltyMoment = usePenaltyMoment();
-  const abilityMoment = useAbilityMoment();
-  const matchMoment = useMatchMoment();
-  const reducedMotion = useReducedMotion();
-  // Height, not width. The cards are already height-aware, so on a short
-  // screen they shrink while the furniture around them keeps its full budget
-  // and the board overflows. Below this the seats drop to their one-line
-  // header and the caption rail retires, which is worth about 90px.
-  const shortViewport = useMediaQuery("(max-height: 1000px)");
+  const b = useUISelector(selectBoard);
 
-  // The round-ending broadcast both moves the last card and flips the stage:
-  // mounting the end sheet immediately buries a flight ~0.3s into its 0.65s
-  // travel (the owner's "abrupt end"). Hold the sheet until the table has
-  // visibly settled. GAMEOVER can also arrive directly (forfeit path).
-  const isEndStage =
-    gameStage === GameStage.SCORING || gameStage === GameStage.GAMEOVER;
-  const [tableSettled, setTableSettled] = useState(false);
-  useEffect(() => {
-    if (!isEndStage) {
-      setTableSettled(false);
-      return;
-    }
-    if (reducedMotion) {
-      setTableSettled(true);
-      return;
-    }
-    const t = setTimeout(() => setTableSettled(true), 1100);
-    return () => clearTimeout(t);
-  }, [isEndStage, reducedMotion]);
-  const endScene = isEndStage && tableSettled;
+  const me: Player | null =
+    (b.localPlayerId && b.players?.[b.localPlayerId]) || null;
+  const mySeat = me?.seatIndex ?? 0;
+  const positions = useMemo(() => relativeSeats(mySeat), [mySeat]);
 
-  if (!localPlayerId || !gameState) {
-    return <LoadingIndicator />;
-  }
-
-  const isDealing = gameState.gameStage === GameStage.DEALING;
-
-  const dealingDeck: PublicCard[] = isDealing
-    ? Object.values(gameState.players).flatMap((p) =>
-        p.hand
-          .filter((c): c is PublicCard => c !== null)
-          .map((card) => ({ id: card.id, facedown: true as const })),
-      )
-    : [];
-
-  const drawnCardData = playerWithPendingCard?.pendingDrawnCard?.card;
-
-  // Seat opponents in turn order starting just after the local player, so the
-  // band reads the way the table plays (your left, going clockwise). Falls
-  // back to object order before turnOrder is populated.
-  const seatOrder =
-    gameState.turnOrder && gameState.turnOrder.length > 0
-      ? gameState.turnOrder
-      : Object.keys(gameState.players);
-  const localSeatPos = seatOrder.indexOf(localPlayerId);
-  const rotatedIds =
-    localSeatPos >= 0
-      ? [
-          ...seatOrder.slice(localSeatPos + 1),
-          ...seatOrder.slice(0, localSeatPos),
-        ]
-      : seatOrder;
-  const opponentPlayers = rotatedIds
-    .map((id) => gameState.players[id])
-    .filter((p): p is NonNullable<typeof p> => !!p && p.id !== localPlayerId);
-
-  // Dense the opponent band once the table is tightly set: 3+ opponents in
-  // play, or 4+ seats total at the reveal (where the local hand joins the
-  // band). Below that, seats render at their regular full size, so the 2-4
-  // player experience is unchanged.
-  const totalPlayers = Object.keys(gameState.players).length;
-  const denseBand = endScene ? totalPlayers >= 4 : opponentPlayers.length >= 3;
-  // The one-line seat header is driven by height as well as by seat count: it
-  // is the same trade either way, the status text moving to an icon so the
-  // chip's ~29px comes back, and it costs twice on a two player board and six
-  // times on a full one.
-  const compactSeats = denseBand || shortViewport;
-  const localPlayerData = gameState.players[localPlayerId];
-
-  const handlePlayAgain = () => {
-    send({ type: PlayerActionType.PLAY_AGAIN });
+  const seatPlayer = (seatIndex: number): Player | null => {
+    const id = b.seats?.[seatIndex];
+    return (id && b.players?.[id]) || null;
   };
 
-  const handleRequestPlayAgain = () => {
-    send({ type: PlayerActionType.REQUEST_PLAY_AGAIN });
-  };
+  const isMyTurn = !!b.localPlayerId && b.currentPlayerId === b.localPlayerId;
+  const result = b.result;
+  const stack = b.stack ?? [];
+  const topRank = stack.length ? stack[stack.length - 1].rank : null;
+  const isPlaying = b.gameStage === GameStage.PLAYING;
+  const endScene =
+    b.gameStage === GameStage.SCORING || b.gameStage === GameStage.GAMEOVER;
+
+  const throwCard = (cardId: string) =>
+    send({ type: PlayerActionType.THROW_CARD, payload: { cardId } });
+
+  const seatFor = (position: "top" | "left" | "right") => (
+    <PlayerSeat
+      player={seatPlayer(positions[position])}
+      seatIndex={positions[position]}
+      isCurrent={
+        !!b.currentPlayerId &&
+        b.seats?.[positions[position]] === b.currentPlayerId
+      }
+      isLocalPlayer={false}
+      isPartner={position === "top"}
+      orientation={position}
+    />
+  );
 
   return (
-    <div className="relative h-screen w-full bg-ground flex flex-col overflow-hidden @container font-game">
+    <div className="relative flex h-full w-full flex-col bg-ground font-game">
       <GameHeader />
-      {/* CHECK's recede is momentary and returns to identity. A HELD scale
-          here (the R12 end-of-round recede) made every layout-projected card
-          under it fight the projection system on Gecko — the board bounced
-          up and down indefinitely. The end scene now makes room with real
-          layout (row order + hidden rows) instead of a transform. */}
-      <motion.div
-        className="relative flex-1 grid grid-rows-[auto_auto_1fr_auto_auto]"
-        animate={{ scale: checkMoment && !reducedMotion ? 0.92 : 1 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        style={{ transformOrigin: "center" }}
-      >
-        <ConnectionStatusBanner />
-        {localPlayerForfeited && !isEndStage && (
-          <ForfeitNotice onLeave={() => send({ type: "LEAVE_GAME" })} />
-        )}
-        <GameStateError
-          hasPlayers={opponentPlayers.length > 0}
-          hasGameState={!!gameState}
+
+      <div className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-2 md:px-6">
+        <TeamScoreboard
+          scores={b.teamScores ?? { [Team.A]: 0, [Team.B]: 0 }}
+          myTeam={me?.team}
         />
+        <div className="flex items-center gap-4">
+          <span className="hidden text-xs font-semibold uppercase tracking-widest text-ink-muted sm:inline">
+            {b.cardsRemaining} left
+          </span>
+          {isPlaying && (
+            <TurnTimer
+              deadline={b.turnDeadline}
+              timerMs={b.turnTimerMs}
+              clockOffset={b.serverClockOffset}
+            />
+          )}
+        </div>
+      </div>
 
-        <ActionController>
-          <div className="contents">
-            {/* End scene: the caption and action rows retire, and the grid
-                reorders — opponents, then YOUR revealed hand, then the piles
-                sinking into the leftover row under the results panel. Pure
-                CSS order: the layoutId cards glide once and settle. */}
-            {!endScene && <GameEventCaption />}
-            {/* Opponents area */}
-            <div
+      {!endScene && <GameEventCaption />}
+
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {/* Partner, opposite. Same team as you by construction: seats
+            alternate, so two seats along is always your other half. */}
+        <div className="flex shrink-0 justify-center pt-2">
+          {seatFor("top")}
+        </div>
+
+        <div className="flex min-h-0 flex-1 items-center justify-between gap-2 px-2 md:px-6">
+          {seatFor("left")}
+          <TableArea stack={stack} stackValue={b.stackValue} />
+          {seatFor("right")}
+        </div>
+
+        <div
+          className={cn(
+            "shrink-0 border-t pb-2 transition-colors",
+            isMyTurn ? "border-ink" : "border-hairline",
+          )}
+        >
+          <div className="flex items-center justify-center gap-2 pt-1.5 text-[11px] font-semibold uppercase tracking-widest">
+            <span
               className={cn(
-                "flex justify-center items-center py-2 tiny:py-0.5",
-                endScene && "order-1",
+                me?.team === Team.A ? "text-team-a" : "text-team-b",
               )}
             >
-              {opponentPlayers.length > 0 || endScene ? (
-                <div
-                  className={cn(
-                    "w-full flex flex-wrap justify-evenly",
-                    // The wider x-gap is what deterministically wraps the dense
-                    // seats (3 per row at 393px) instead of cramming a fourth.
-                    denseBand ? "gap-x-3 gap-y-2" : "gap-2",
-                  )}
-                >
-                  {opponentPlayers.map((op, i) => (
-                    <PlayerHandStrip
-                      key={op.id}
-                      player={{
-                        ...op,
-                        hand: isDealing ? [] : op.hand,
-                      }}
-                      isLocalPlayer={false}
-                      isCurrentTurn={gameState.currentPlayerId === op.id}
-                      tableIndex={i}
-                      compact={compactSeats}
-                      denseCards={denseBand}
-                    />
-                  ))}
-                  {/* At the reveal the local hand joins the band as a final
-                      dense seat, so every hand lands on the table together
-                      above the results sheet. During play it lives in its own
-                      row below (full size). */}
-                  {endScene && localPlayerData && (
-                    <PlayerHandStrip
-                      key={localPlayerData.id}
-                      player={localPlayerData}
-                      isLocalPlayer
-                      isCurrentTurn={false}
-                      tableIndex={opponentPlayers.length}
-                      compact={compactSeats}
-                      denseCards={denseBand}
-                    />
-                  )}
-                </div>
-              ) : (
-                <p className="font-game text-ink-muted">
-                  Waiting for opponents...
-                </p>
-              )}
-            </div>
-
-            {/* Table Area - takes up remaining space. Extra vertical padding
-                gives the center decks breathing room from the opponent band
-                above and the local hand below (they read cramped without it);
-                the 1fr row absorbs it, and the @md guard keeps it modest on
-                dense phone layouts. */}
-            <div
-              className={cn(
-                // min-h-0 so the 1fr track can actually give. Grid items floor
-                // at their content's min height by default, so the one row
-                // meant to absorb slack could not, and fractional card heights
-                // (15vw on an aspect-[5/7]) left the board a pixel or two over
-                // its frame with nowhere to put it.
-                "flex min-h-0 items-center justify-center @container",
-                endScene ? "order-3" : shortViewport ? "py-2" : "py-4 @md:py-6",
-              )}
-            >
-              <TableArea drawnCard={drawnCardData} dealingDeck={dealingDeck} />
-            </div>
-
-            {/* Local player area. At the reveal the local hand moves up into
-                the opponents band, so this row is left empty (the grid track
-                collapses) rather than duplicating the hand. */}
-            <div
-              className={cn(
-                "flex flex-col items-center justify-center py-2 tiny:py-0.5",
-                endScene && "order-2",
-              )}
-            >
-              {!endScene && localPlayerData ? (
-                <PlayerHandStrip
-                  player={{
-                    ...localPlayerData,
-                    hand: isDealing ? [] : localPlayerData.hand,
-                  }}
-                  isLocalPlayer={true}
-                  isCurrentTurn={isMyTurn}
-                  tableIndex={opponentPlayers.length}
-                  compact={compactSeats}
-                  // Your own hand stays regular size, because it is the one
-                  // you act on. The exception is a crowded table on a short
-                  // screen: at six players a phone cannot afford both a
-                  // wrapped opponent band and a full size hand, and a hand
-                  // that does not fit is worse than a smaller one.
-                  denseCards={denseBand && shortViewport}
-                />
-              ) : null}
-            </div>
-            {/* Action bar: fixed-height row so its changing content (button
-                sets, prompt, countdown) never resizes the 1fr table row
-                above — that reflow was the board visibly shifting up/down on
-                every phase change. Retired for the end scene (it would be an
-                empty pill floating under the results panel). */}
-            {!endScene && (
-              <div
-                className={cn(
-                  // pb-2 goes on a short screen: the bar's own content is
-                  // 114px against this row's 112, so the padding was pushing
-                  // the last two pixels out through the bottom of the board.
-                  "flex items-center justify-center pb-2 short:pb-0",
-                  // The bar's own content is 112px: the pill, then the
-                  // fixed prompt slot, then the countdown rail. h-32 is
-                  // headroom, and headroom is the first thing to go.
-                  shortViewport ? "h-28 tiny:h-24" : "h-28 @md:h-32",
-                )}
-              >
-                <ActionControllerView />
-              </div>
+              {me ? `You · Team ${me.team}` : "You"}
+            </span>
+            {isPlaying && (
+              <span className={isMyTurn ? "text-ink" : "text-ink-muted"}>
+                {isMyTurn ? "· your turn" : "· waiting"}
+              </span>
             )}
           </div>
-        </ActionController>
-      </motion.div>
-
-      <CheckStamp moment={checkMoment} />
-      <PenaltyStamp moment={penaltyMoment} />
-      <AbilityStamp moment={abilityMoment} />
-      <MatchStamp moment={matchMoment} />
+          <PlayerHand
+            hand={me?.hand ?? []}
+            topRank={topRank}
+            canThrow={isMyTurn && isPlaying}
+            onThrow={throwCard}
+          />
+        </div>
+      </div>
 
       <AnimatePresence>
-        {endScene && (
-          <RoundSummary
-            players={players}
-            winnerIds={winnerIds}
-            localPlayerId={localPlayerId}
-            playerWins={gameState.playerWins ?? {}}
-            playerTotals={gameState.playerTotals ?? {}}
-            rematchVotes={gameState.rematchVotes ?? []}
-            onPlayAgain={handlePlayAgain}
-            onRequestPlayAgain={handleRequestPlayAgain}
-            onLeave={() => send({ type: "LEAVE_GAME" })}
-            onToggleChat={() => send({ type: "TOGGLE_SIDE_PANEL" })}
-          />
+        {endScene && result && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-30 flex items-center justify-center bg-ground/90 p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 8 }}
+              animate={{ scale: 1, y: 0 }}
+              className="w-full max-w-md rounded-2xl border border-hairline bg-surface p-8 text-center"
+            >
+              <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                Hand over
+              </p>
+              <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-ink">
+                {result.isDraw ? (
+                  "A draw"
+                ) : (
+                  <>
+                    Team{" "}
+                    <span
+                      className={
+                        result.winner === Team.A ? "text-team-a" : "text-team-b"
+                      }
+                    >
+                      {result.winner}
+                    </span>{" "}
+                    wins
+                  </>
+                )}
+              </h2>
+
+              <div className="mt-6 flex items-center justify-center gap-8">
+                {[Team.A, Team.B].map((team) => (
+                  <div key={team} className="flex flex-col items-center">
+                    <span
+                      className={cn(
+                        "text-[11px] font-bold uppercase tracking-widest",
+                        team === Team.A ? "text-team-a" : "text-team-b",
+                      )}
+                    >
+                      Team {team}
+                    </span>
+                    <span className="text-4xl font-extrabold tabular-nums text-ink">
+                      {result.teamScores[team]}
+                    </span>
+                    <span className="text-xs text-ink-muted">
+                      {b.teamWins?.[team] ?? 0} hand
+                      {(b.teamWins?.[team] ?? 0) === 1 ? "" : "s"} won
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {result.strandedCardCount > 0 && (
+                <p className="mt-4 text-xs text-ink-muted">
+                  {result.strandedCardCount} cards were left on the table and
+                  scored for nobody ({result.strandedPoints} points).
+                </p>
+              )}
+
+              <div className="mt-8 flex flex-col items-center gap-3">
+                {b.localPlayerId === b.hostId ? (
+                  <button
+                    onClick={() => send({ type: PlayerActionType.PLAY_AGAIN })}
+                    className="h-12 rounded-pill bg-accent px-7 text-base font-bold text-accent-ink transition-colors hover:bg-accent/90"
+                    data-cursor-link
+                  >
+                    Deal another hand
+                  </button>
+                ) : (
+                  <button
+                    onClick={() =>
+                      send({ type: PlayerActionType.REQUEST_PLAY_AGAIN })
+                    }
+                    className="h-12 rounded-pill border border-hairline bg-surface px-7 text-base font-bold text-ink transition-colors hover:bg-surface-2"
+                    data-cursor-link
+                  >
+                    {b.rematchVotes?.includes(b.localPlayerId ?? "")
+                      ? "Waiting for the host…"
+                      : "I want another hand"}
+                  </button>
+                )}
+                <button
+                  onClick={() => send({ type: "LEAVE_GAME" })}
+                  className="text-xs font-semibold text-ink-muted underline underline-offset-4 hover:text-ink"
+                >
+                  Leave table
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Root level, painted last: never inside the (transformable) board
-          container — a scaled ancestor shrank it off the right edge — and
-          always above the results panel, so post-game chat stays usable. */}
       <SidePanel />
     </div>
   );
-}
+};
+
+export default GameBoard;

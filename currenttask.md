@@ -1,10 +1,10 @@
 # Split 13 — Current Task
 
-**Updated:** 2026-08-31 · **Branch:** `feat/split-13` · **Last commit:** `fee1fe9`
+**Updated:** 2026-08-31 (session 2) · **Branch:** `feat/split-13`
 
 Porting this repo from **Check!** (the game it was forked from) to **Split 13**. The spec is `design-vault/Redesign/Split 13 - Game Rules.md` (v2 — every open question answered). Treat that doc as the specification, the way `docs/GAME_RULES.md` was for Check!.
 
-**One-line status:** the game engine is finished and tested; the client is mid-port and does not compile yet (126 errors, all in view components).
+**One-line status:** engine finished and tested; **client now compiles clean (126 errors → 0) and lints clean**. Not yet seen running in a browser — see §3.1.
 
 ---
 
@@ -26,7 +26,7 @@ Rewritten around seats and teams instead of hidden hands.
 - `server/src/game-machine.ts` — written from scratch (~720 lines, replacing Check!'s 95KB engine). Deal 13x4, random starting seat, clockwise turns, throw one card, capture on rank match, full table clear, team scoring, 20s timer with random auto-throw, bot turns, draw handling, Play Again that keeps seats/teams/team wins.
 - `server/src/lib/bots.ts` — new. Three tiers (rules §11).
 - `server/src/lib/deck-utils.ts` — added `dealHands`, `sortHand`, `emptyRankCounts`.
-- `server/src/state-redactor.ts` — rewritten and much smaller. Hides exactly one thing: an opponent's hand *contents*.
+- `server/src/state-redactor.ts` — rewritten and much smaller. Hides exactly one thing: an opponent's hand _contents_.
 - `server/src/types.ts`, `server/src/index.ts` — ported.
 - `scripts/check-split13-rules.mjs` — new, wired as `npm run check:rules`.
 
@@ -54,54 +54,47 @@ Removed: `initialPeek` / `finalTurns` / `ability` states, `visibleCards`, `hasPa
 
 ## 3. TO DO
 
-### 3.1 Get the client compiling — 126 errors across 12 files
+### 3.1 Run it and look at it ⚠️ THE NEXT STEP
 
-Verified error counts as of this update. Work top-down; the big four are the real rebuild.
-
-| Errors | File | Work |
-|---|---|---|
-| 23 | `components/game/PlayerHand.tsx` | 13-card hand, always face-up to owner, click a card to throw, enabled only on your turn |
-| 23 | `components/game/GameBoard.tsx` | Rebuild: 4 seats (me bottom, partner top, opponents left/right), stack in the centre |
-| 22 | `components/game/PlayerHandStrip.tsx` | Opponent seat: name, team, card count, bot badge, turn highlight |
-| 18 | `components/game/TableArea.tsx` | One capture stack (not draw + discard piles) with its live point value |
-| 10 | `components/game/useGameSounds.ts` | Drop peek/ability/match/penalty/check sounds; add a capture sound |
-| 10 | `components/game/GameLobby.tsx` | 4 fixed seats, seat/team picker, bot-fill preview, difficulty setting; teams lock at start |
-| 10 | `app/providers.tsx` | Remove the two dead socket bridges (`INITIAL_PEEK_INFO`, `ABILITY_PEEK_RESULT`) and their `socket.off` cleanups; drop `AbilityPeekResultPayload`; rename `ClientCheckGameState` to `ClientSplitGameState` |
-| 4 | `components/game/GameEventCaption.tsx` | New event vocabulary (throw / capture) |
-| 3 | `components/layout/SidePanel.tsx` | Log/chat panel — same vocabulary update |
-| 1 | `lib/types.ts` | Delete `isDrawnCard` (no drawn card in Split 13) |
-| 1 | `components/modals/NewGameModal.tsx` | Replace the 2-6 player picker with the bot-difficulty room setting |
-| 1 | `components/cards/VisualCardStack.tsx` | Generalise to one growing capture stack |
-
-Live list any time:
+Everything compiles, but **no one has seen the board yet**. This needs you, because it cannot be done from this session (see §5):
 
 ```
-npx tsc --noEmit -p client/tsconfig.json
+npm run dev
 ```
 
-### 3.2 New components Split 13 needs (none exist yet)
+Then open http://localhost:3000, create a table, and start solo against three bots.
 
-- Seat/team picker for the lobby (locks once the host starts)
-- Team scoreboard — live A vs B
-- Live table-stack value indicator (rules §9 — the number the whole risk decision turns on)
-- 20s turn-timer countdown, visible to everyone, not just the active player
-- Bot indicator on a seat, and the bot-difficulty room-setting control
-- `--team-a` / `--team-b` colour tokens in `app/globals.css` (light + dark + the `@theme` mapping)
+What to check against the rules doc:
 
-### 3.3 Then
+- Cards deal 13 to you, three bot seats fill, teams read as A (seats 1 & 3) and B (seats 2 & 4)
+- Your hand is face-up to you and sorted; opponents show a card count only
+- Tap a card to select, tap again to throw; a card that would capture is ringed
+- The stack grows, shows its live point value, and is swept whole on a capture
+- The 20s timer runs for whoever is on the clock; letting it expire throws a random card for you
+- Team scores update live; the hand ends after 52 throws with a result overlay
 
-- Landing page (`app/page.tsx`) and rules page (`app/rules/`) still carry Check!'s copy and illustrations — they compile, so they are last
+**Known environment issue:** `app/layout.tsx` fetches Nunito Sans from Google Fonts at build time. `npm run dev` degrades to a fallback font if that is unreachable; `npm run build` hard-fails. Fine on a normal connection. If you want it network-independent, the repo already ships the TTFs — but only weights 400 and 800, and the UI uses `font-semibold` (57×) and `font-bold` (34×), which would both snap to 800 and flatten the type hierarchy. Left as-is deliberately; your call.
+
+### 3.2 Rebrand pass (compiles today, still says Check!)
+
+- `app/page.tsx` — landing copy and illustrations
+- `app/rules/` — still Check!'s rules; Split 13's are in `design-vault/Redesign/Split 13 - Game Rules.md`
+- `GameHeader.tsx` wordmark · `BrandMark.tsx` · `Signature.tsx` · `public/signature.svg` · `lib/site.ts`
+- Icons and share card: `app/manifest.ts`, `apple-icon.tsx`, `icon.svg`, `icon-512/`, `maskable-icon/`, `opengraph-image.tsx`
+- `client/package.json` name/description
+
+### 3.3 Cleanup
+
 - Delete or rewrite the obsolete `scripts/check-*.mjs` (hidden cards, penalty placement, short peek, series totals) — they assert mechanics that no longer exist
-- Port `server/.env.example` (still documents Check!'s knobs; Split 13 reads `TURN_TIMER_MS`, `BOT_THINK_MS`)
-- **Run it end to end:** `npm run dev`, play a hand against three bots, confirm captures / scores / timer match the rules doc
-- Update the five `.visualmd` files and commit
-
----
+- `lib/sounds.ts` still declares 7 sprites for cut mechanics (peek/ability/penalty/check/swap/draw/skip) and their mp3s are still in `public/sounds/`
+- Port `server/.env.example` (still Check!'s knobs; Split 13 reads `TURN_TIMER_MS`, `BOT_THINK_MS`)
+- `tools/probe/` still drives Check!'s flow — rebuild against Split 13's, or drop it
 
 ## 4. Open decisions
 
-1. **13-card hand layout** — fanned/overlapping (looks like real cards, tighter on mobile) or a flat scrollable row (easier to hit accurately on a phone)? Drives most of `PlayerHand` and `GameBoard`. **Not yet answered — blocks 3.1's big four.**
-2. **Bot difficulty granularity** — currently one room-wide setting. Should the host be able to set it per bot seat? (Also logged in `design-vault/Redesign/Open Questions.md`.)
+1. ~~13-card hand layout~~ — **decided: overlapping fan.** Thirteen cards do not fit side by side on a phone, and the overlap is set so each card's rank corner stays visible, which is the only part that matters in a matching game. Easy to swap for a flat scrollable row: it is one `-ml-*` class in `PlayerHand.tsx`.
+2. **Google Fonts dependency** — see §3.1. Keep the variable font (needs network at build time) or self-host the two local weights (flattens semibold/bold into extrabold)?
+3. **Bot difficulty granularity** — currently one room-wide setting. Should the host be able to set it per bot seat? (Also logged in `design-vault/Redesign/Open Questions.md`.)
 
 ---
 
@@ -112,7 +105,8 @@ npx tsc --noEmit -p client/tsconfig.json
 - **Remote commands cap at ~180s and each runs in a fresh sandbox**, so background processes do not survive between calls. Long installs must be run directly, or the work moved into the cloud container.
 - **Container fallback:** copying `shared-types/` + `server/` sources into the cloud container and running `npm install` + `tsc` there is much faster for headless verification. It cannot verify UI.
 - **`npm run check:rules` sets its own fast pacing** (`TURN_TIMER_MS=300`, `BOT_THINK_MS=1`) before importing the machine. Without that it inherits the real 20s timer and one run takes ~33 minutes.
-- **`npm run verify:server`** is the gate while the client is being ported; full `npm run verify` runs the client build and cannot pass yet.
+- **`npm run verify:server`** passes. Full `npm run verify` still cannot complete here because the client production build needs Google Fonts.
+- **The client cannot be run from this session.** Each remote command is a fresh sandbox capped at ~180s, so a dev server dies with the call that started it; and this sandbox cannot reach fonts.googleapis.com, which alone eats the budget in retries. Next dev also needs ~75s just to boot against the OneDrive-mounted path. Running it is a job for your machine.
 
 ---
 

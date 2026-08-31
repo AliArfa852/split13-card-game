@@ -10,6 +10,7 @@ const SPRITES = {
   place: "/sounds/place.mp3",
   peek: "/sounds/peek.mp3",
   match: "/sounds/match.mp3",
+  capture: "/sounds/match.mp3",
   penalty: "/sounds/penalty.mp3",
   check: "/sounds/check.mp3",
   yourTurn: "/sounds/your-turn.mp3",

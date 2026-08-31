@@ -12,7 +12,7 @@ import {
   UserMinus,
   WifiOff,
 } from "lucide-react";
-import { type Player, PlayerActionType } from "shared-types";
+import { type Player, PlayerActionType, SEAT_COUNT } from "shared-types";
 import {
   useUIActorRef,
   useUISelector,
@@ -21,7 +21,6 @@ import {
 import { CardBack } from "@/components/cards/CardBack";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { LearnCheckSheet } from "./LearnCheckSheet";
 import { cn } from "@/lib/utils";
 import { play } from "@/lib/sounds";
 
@@ -39,24 +38,21 @@ const selectLobbyProps = (state: UIMachineSnapshot) => {
       gameMasterId: null as string | null,
       allPlayersReady: false,
       hasEnoughPlayers: false,
-      maxPlayers: 4,
       gameId,
     };
   }
 
-  const players = (
-    currentGameState.turnOrder?.length
-      ? currentGameState.turnOrder.map(
-          (id: string) => currentGameState.players[id],
-        )
-      : Object.values(currentGameState.players)
-  ).filter((p): p is Player => !!p);
+  // Seat order, so the lobby lists the table the way it will be played:
+  // seat 1 and 3 are Team A, seat 2 and 4 are Team B.
+  const players = currentGameState.seats
+    .map((id) => (id ? currentGameState.players[id] : null))
+    .filter((p): p is Player => !!p);
   const localPlayer = localPlayerId
     ? (currentGameState.players[localPlayerId] ?? null)
     : null;
 
   const readyAndConnectedCount = players.filter(
-    (p) => p.isReady && p.isConnected,
+    (p) => p.id !== currentGameState.hostId && p.isReady && p.isConnected,
   ).length;
   const hasDisconnectedPlayers = players.some((p) => !p.isConnected);
 
@@ -64,14 +60,16 @@ const selectLobbyProps = (state: UIMachineSnapshot) => {
     isLoading: false,
     players,
     localPlayer,
-    isGameMaster: localPlayerId === currentGameState.gameMasterId,
-    gameMasterId: currentGameState.gameMasterId,
+    isGameMaster: localPlayerId === currentGameState.hostId,
+    gameMasterId: currentGameState.hostId,
+    // The host is not asked to ready up — starting IS their readiness — so a
+    // host alone against three bots is a legal table, which mirrors the
+    // server's own canStart guard.
     allPlayersReady:
-      readyAndConnectedCount === players.length &&
-      players.length > 1 &&
+      readyAndConnectedCount >=
+        players.filter((p) => p.id !== currentGameState.hostId).length &&
       !hasDisconnectedPlayers,
-    hasEnoughPlayers: players.length >= 2,
-    maxPlayers: currentGameState.maxPlayers ?? 4,
+    hasEnoughPlayers: players.length >= 1,
     gameId,
   };
 };
@@ -227,7 +225,6 @@ export const GameLobby = () => {
     gameMasterId,
     allPlayersReady,
     hasEnoughPlayers,
-    maxPlayers,
     gameId,
   } = useUISelector(selectLobbyProps);
   const reduced = !!useReducedMotion();
@@ -235,7 +232,6 @@ export const GameLobby = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [reconnectionTimeout, setReconnectionTimeout] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [learnOpen, setLearnOpen] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -305,13 +301,16 @@ export const GameLobby = () => {
     });
   };
 
+  const emptySeats = Math.max(0, SEAT_COUNT - players.length);
   const statusLine = !hasEnoughPlayers
     ? "Waiting for players"
     : !allPlayersReady
       ? "Waiting for everyone to ready up"
-      : isGameMaster
-        ? "Everyone is ready"
-        : "Everyone is ready. Waiting for the host to start";
+      : emptySeats > 0
+        ? `${emptySeats} seat${emptySeats === 1 ? "" : "s"} will be filled by bots`
+        : isGameMaster
+          ? "Everyone is ready"
+          : "Everyone is ready. Waiting for the host to start";
 
   // One accent action at a time: Start when startable, otherwise Ready up;
   // once ready with nothing to start, the quiet pill is the way back.
@@ -328,19 +327,9 @@ export const GameLobby = () => {
       ? { label: "Ready up", onClick: toggleReady, accent: true }
       : { label: "Unready", onClick: toggleReady, accent: false };
 
-  const emptySeats = Math.max(0, maxPlayers - players.length);
-
-  // Seats size to the table, the way the board's seats already do. Every seat
-  // renders whether or not anyone is in it, so a host picking six makes the
-  // lobby its tallest before a single guest arrives, which is exactly when it
-  // has to fit. Narrower cards also fit more per row, and a row saved is worth
-  // more than the width given up.
-  const seatWidth =
-    maxPlayers >= 6
-      ? "w-16 sm:w-20"
-      : maxPlayers >= 4
-        ? "w-20 sm:w-24"
-        : "w-24 sm:w-28";
+  // Split 13 is always four seats, so the row never has to size itself down
+  // for a bigger table the way Check!'s two-to-six lobby did.
+  const seatWidth = "w-20 sm:w-24";
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-ground font-game">
@@ -433,7 +422,7 @@ export const GameLobby = () => {
             >
               <div className="flex aspect-[5/7] w-full items-center justify-center rounded-card border border-hairline">
                 <span className="text-xs font-semibold text-ink-muted">
-                  Open
+                  Bot
                 </span>
               </div>
               <span className="h-[22px]" aria-hidden />
@@ -442,7 +431,7 @@ export const GameLobby = () => {
         </div>
 
         <p className="mt-8 text-sm font-semibold text-ink-muted short:mt-3 tiny:mt-1">
-          {players.length} of {maxPlayers} seats filled
+          {players.length} of {SEAT_COUNT} seats filled
         </p>
         <p className="mt-1 h-5 text-sm text-ink-muted">{statusLine}</p>
 
@@ -460,13 +449,6 @@ export const GameLobby = () => {
 
         <p className="mt-10 text-sm text-ink-muted short:mt-4 tiny:mt-2">
           New here?{" "}
-          <button
-            onClick={() => setLearnOpen(true)}
-            className="font-semibold text-ink underline underline-offset-4"
-          >
-            How to play
-          </button>{" "}
-          ·{" "}
           <Link
             href="/rules"
             target="_blank"
@@ -476,8 +458,6 @@ export const GameLobby = () => {
           </Link>
         </p>
       </main>
-
-      <LearnCheckSheet open={learnOpen} onClose={() => setLearnOpen(false)} />
     </div>
   );
 };
