@@ -10,7 +10,6 @@ import {
 } from "react";
 import {
   motion,
-  useInView,
   AnimatePresence,
   useReducedMotion,
   type Variants,
@@ -20,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Users, ArrowRight, Check, Menu, X } from "lucide-react";
 import { BrandMark } from "@/components/ui/BrandMark";
-import { Signature, secondSignature } from "@/components/ui/Signature";
 import { NewGameModal } from "@/components/modals/NewGameModal";
 import { JoinGameModal } from "@/components/modals/JoinGameModal";
 import { useDevice } from "@/context/DeviceContext";
@@ -384,21 +382,6 @@ const StorySection = ({
   </section>
 );
 
-/** Draws both signatures once their spot scrolls into view. */
-const SignatureInView = () => {
-  const ref = useRef<HTMLSpanElement | null>(null);
-  const inView = useInView(ref, { once: true, amount: 0.5 });
-  // The signatures are drawings with no text in them, so left alone the link
-  // they sit in announces as its only readable character, an ampersand.
-  return (
-    <span ref={ref} className="inline-flex items-center gap-2" aria-hidden>
-      <Signature isInView={inView} />
-      <span>&amp;</span>
-      <Signature isInView={inView} data={secondSignature} />
-    </span>
-  );
-};
-
 function HomePage() {
   const [showNewGame, setShowNewGame] = useState(false);
   const [showJoinGame, setShowJoinGame] = useState(false);
@@ -469,10 +452,10 @@ function HomePage() {
     },
   };
 
-  const checkText = (showMark ? "Check!" : "Check").split("");
+  const wordmarkText = (showMark ? "Split 13" : "Split 1").split("");
   // The mark is the last child of the lockup, so it lifts one beat after the
   // letter before it, the same beat the container puts between the letters.
-  const markLiftDelay = (checkText.length - 1) * LETTER_STAGGER;
+  const markLiftDelay = (wordmarkText.length - 1) * LETTER_STAGGER;
   // One signal for the whole hero: the lockup and the hand each raise it and
   // both read it, so hovering either one animates the other.
   const isLifted = (isHeroHovered || isAnnouncing) && !shouldReduceMotion;
@@ -549,7 +532,7 @@ function HomePage() {
           >
             <BrandMark className="h-8" />
             <span className="text-2xl font-extrabold tracking-tight text-ink">
-              Check!
+              Split 13
             </span>
           </Link>
 
@@ -638,11 +621,11 @@ function HomePage() {
                     initial="initial"
                     animate={isLifted ? "hover" : "initial"}
                     className="flex"
-                    aria-label="Check!"
+                    aria-label="Split 13"
                   >
                     <AnimatePresence initial={false}>
-                      {checkText.map((char, index) =>
-                        char === "!" ? (
+                      {wordmarkText.map((char, index) =>
+                        index === wordmarkText.length - 1 && showMark ? (
                           <motion.span
                             key="mark"
                             className="inline-block"
@@ -898,11 +881,11 @@ function HomePage() {
         <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-y-4 px-5 py-6 text-center sm:grid-cols-3 sm:px-8 sm:text-left">
           <div className="hidden items-center gap-3 justify-self-start sm:flex">
             <BrandMark className="h-6 rounded-[4px]" />
-            <span className="text-lg font-bold text-ink">Check!</span>
+            <span className="text-lg font-bold text-ink">Split 13</span>
           </div>
           <div className="flex items-center justify-center text-sm font-normal text-ink-muted">
             <div className="flex flex-row items-center gap-x-2">
-              <span>© {new Date().getFullYear()} Check Card Game.</span>
+              <span>© {new Date().getFullYear()} Split 13.</span>
               <div className="hidden sm:block">|</div>
               <div
                 className="flex items-center"
@@ -950,17 +933,19 @@ function HomePage() {
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-center gap-2 text-sm font-normal text-ink-muted sm:justify-self-end">
-            <span>Made by</span>
+          {/* Split 13 is a fork, and the engine it grew out of was somebody
+              else's work, so the credit says so rather than quietly dropping
+              it. Their hand-drawn signatures went with their names. */}
+          <div className="flex items-center justify-center gap-1.5 text-sm font-normal text-ink-muted sm:justify-self-end">
+            <span>Forked from</span>
             <a
               href="https://github.com/vroslmend/check-the-card-game-v2"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Ammar and Farhan, on GitHub"
-              className="inline-flex items-center transition-colors hover:text-accent"
-              data-cursor-icon
+              className="font-semibold transition-colors hover:text-accent"
+              data-cursor-link
             >
-              <SignatureInView />
+              Check!
             </a>
           </div>
         </div>

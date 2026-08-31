@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   // Inherited by any route that sets no title of its own, which is why
   // app/game/layout.tsx sets one: a room tab must not read this sentence.
-  title: "Check! - free online card game to play with friends",
+  title: "Split 13 - free online team card game to play with friends",
   description: SITE_DESCRIPTION,
   // Proves ownership of the Search Console property. A public tag rather than
   // a secret, and it has to stay: Google re-checks, so a property that loses
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   verification: { google: "w0uP0kvKNvORgtpbYZQ8UDucoJr4CDUfi0XLACdzaR0" },
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Check!",
+    title: "Split 13",
     description: "Play online with friends, in real time.",
     url: "/",
     type: "website",
@@ -50,7 +50,7 @@ export const viewport: Viewport = {
 const gameSchema = {
   "@context": "https://schema.org",
   "@type": "VideoGame",
-  name: "Check!",
+  name: "Split 13",
   // Trailing slash, so this agrees with the canonical and the sitemap entry.
   url: `${SITE_URL}/`,
   description: SITE_DESCRIPTION,

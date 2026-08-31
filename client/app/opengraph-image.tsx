@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const alt = "Check! · online multiplayer card game";
+export const alt = "Split 13 · online multiplayer card game";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -27,21 +27,21 @@ function Heart({ size: s, color }: { size: number; color: string }) {
   );
 }
 
-/** The same mark the app uses: lucide's Check, the game's only icon. */
-function CheckMark({ size: s, color }: { size: number; color: string }) {
+/** The same mark the app uses: the number the game is named for. */
+function Mark({ size: s, color }: { size: number; color: string }) {
   return (
-    <svg
-      width={s}
-      height={s}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth={3}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <div
+      style={{
+        display: "flex",
+        fontFamily: "Nunito Sans",
+        fontSize: s,
+        fontWeight: 800,
+        letterSpacing: "-0.04em",
+        color,
+      }}
     >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
+      13
+    </div>
   );
 }
 
@@ -124,7 +124,7 @@ function Card({
           </div>
         </div>
       ) : (
-        <CheckMark size={Math.round(width * 0.22)} color={ACCENT_INK} />
+        <Mark size={Math.round(width * 0.16)} color={ACCENT_INK} />
       )}
     </div>
   );
@@ -181,7 +181,7 @@ export default async function OpengraphImage() {
               transform: "rotate(-6deg)",
             }}
           >
-            <CheckMark size={30} color={ACCENT_INK} />
+            <Mark size={24} color={ACCENT_INK} />
           </div>
           <div
             style={{
@@ -192,7 +192,7 @@ export default async function OpengraphImage() {
               lineHeight: 0.95,
             }}
           >
-            Check!
+            Split 13
           </div>
         </div>
 

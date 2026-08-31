@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 // iOS does not read the manifest for the home screen icon, it wants an
 // apple-touch-icon, and it does not round or pad one either. So this is the
@@ -11,7 +13,10 @@ const GROUND = "#121212"; // --ground   0 0% 7%
 const ACCENT = "#BA3F3B"; // --accent   2 52% 48%
 const ACCENT_INK = "#FFF6F0"; // --accent-ink 23 100% 97%
 
-export default function AppleIcon() {
+export default async function AppleIcon() {
+  const extraBold = await readFile(
+    join(process.cwd(), "app/fonts/NunitoSans-ExtraBold.ttf"),
+  );
   return new ImageResponse(
     <div
       style={{
@@ -35,20 +40,29 @@ export default function AppleIcon() {
           transform: "rotate(-6deg)",
         }}
       >
-        <svg
-          width={60}
-          height={60}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={ACCENT_INK}
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <div
+          style={{
+            fontFamily: "Nunito Sans",
+            fontSize: 52,
+            fontWeight: 800,
+            color: ACCENT_INK,
+            letterSpacing: "-0.04em",
+          }}
         >
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
+          13
+        </div>
       </div>
     </div>,
-    size,
+    {
+      ...size,
+      fonts: [
+        {
+          name: "Nunito Sans",
+          data: extraBold,
+          weight: 800 as const,
+          style: "normal" as const,
+        },
+      ],
+    },
   );
 }

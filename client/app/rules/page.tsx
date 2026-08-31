@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import RulesContent from "./RulesContent";
 
 export const metadata: Metadata = {
-  title: "How to play Check! - full rules and scoring",
+  title: "How to play Split 13 - full rules and scoring",
   description:
     "The complete rules of Check!: card values, setup, turns, the matching window, King, Queen and Jack abilities, calling Check, and scoring.",
   alternates: { canonical: "/rules" },

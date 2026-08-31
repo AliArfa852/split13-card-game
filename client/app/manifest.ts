@@ -9,8 +9,8 @@ const GROUND = "#121212"; // --ground 0 0% 7%
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Check! - The Card Game",
-    short_name: "Check!",
+    name: "Split 13 - The Card Game",
+    short_name: "Split 13",
     description: SITE_DESCRIPTION,
     start_url: "/",
     display: "standalone",

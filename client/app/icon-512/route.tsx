@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 // The raster icon at purpose "any", alongside the SVG favicon. Installability
 // checks look for a raster icon of at least 192 that is not maskable-only, and
@@ -13,7 +15,10 @@ const ACCENT_INK = "#FFF6F0"; // --accent-ink 23 100% 97%
 
 const SIZE = 512;
 
-export function GET() {
+export async function GET() {
+  const extraBold = await readFile(
+    join(process.cwd(), "app/fonts/NunitoSans-ExtraBold.ttf"),
+  );
   return new ImageResponse(
     <div
       style={{
@@ -37,20 +42,30 @@ export function GET() {
           transform: "rotate(-6deg)",
         }}
       >
-        <svg
-          width={172}
-          height={172}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={ACCENT_INK}
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <div
+          style={{
+            fontFamily: "Nunito Sans",
+            fontSize: 150,
+            fontWeight: 800,
+            color: ACCENT_INK,
+            letterSpacing: "-0.04em",
+          }}
         >
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
+          13
+        </div>
       </div>
     </div>,
-    { width: SIZE, height: SIZE },
+    {
+      width: SIZE,
+      height: SIZE,
+      fonts: [
+        {
+          name: "Nunito Sans",
+          data: extraBold,
+          weight: 800 as const,
+          style: "normal" as const,
+        },
+      ],
+    },
   );
 }
