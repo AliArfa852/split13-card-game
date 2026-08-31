@@ -8,14 +8,14 @@ Updated: 2026-08-31 (session 3). Update this file in the same pass as any change
 
 ## Top-level config
 
-- .env.example — [COMPLETE] — rewritten for the vars the code actually reads (`PORT`, `CORS_ORIGIN`, `TURN_TIMER_MS`, `BOT_THINK_MS`, `SOCKET_PING_INTERVAL_MS`, `SOCKET_PING_TIMEOUT_MS`); Check!'s MAX_PLAYERS/CARDS_PER_PLAYER/MAX_HAND_SIZE/PEEK_DURATION_MS/MATCHING_STAGE_DURATION_MS/RECONNECT_TIMEOUT_MS/LOBBY_DISCONNECT_TIMEOUT_MS are gone — none of them were read by any file under src/ anymore.
+- .env.example — [COMPLETE] — rewritten for the vars the code actually reads (`PORT`, `CORS_ORIGIN`, `TURN_TIMER_MS`, `BOT_THINK_MIN_MS`/`BOT_THINK_MAX_MS`, `SOCKET_PING_INTERVAL_MS`, `SOCKET_PING_TIMEOUT_MS`); Check!'s MAX_PLAYERS/CARDS_PER_PLAYER/MAX_HAND_SIZE/PEEK_DURATION_MS/MATCHING_STAGE_DURATION_MS/RECONNECT_TIMEOUT_MS/LOBBY_DISCONNECT_TIMEOUT_MS are gone — none of them were read by any file under src/ anymore.
 - package.json — [COMPLETE] — described for Split 13.
 - tsconfig.json — [COMPLETE]
 
 ## src/
 
 - index.ts — [COMPLETE] — socket layer ported. Room settings now carry `botDifficulty` instead of `maxPlayers`; the full-table check reads `seats`; `ACTIONS_REQUIRING_PAYLOAD` covers the new action set; the INITIAL_PEEK re-emit is gone. Rooms, reconnect tokens, lobby codes, session map and the abandoned-game sweep are unchanged and still work.
-- game-machine.ts — [COMPLETE] — written from scratch for Split 13 (~720 lines, replacing Check!'s 95KB engine). Deal 13x4 from a shuffled deck, random starting seat, clockwise turns, throw-one-card, capture on rank match, full table clear, team scoring, 20s turn timer with random auto-throw, bot turns, scoring with draw handling, and Play Again that keeps seats/teams/team wins. `finishHand` is exported so the tie branch can be tested directly.
+- game-machine.ts — [COMPLETE] — bot think-time is now randomized per turn (`BOT_THINK_MIN_MS`/`BOT_THINK_MAX_MS`, default 2000-7000ms) as an XState delay *function*, so each bot draws its own beat instead of the table sharing one fixed 1100ms tick — the old pacing made the opening read as machine-gun fire. Written from scratch for Split 13 (~720 lines, replacing Check!'s 95KB engine). Deal 13x4 from a shuffled deck, random starting seat, clockwise turns, throw-one-card, capture on rank match, full table clear, team scoring, 20s turn timer with random auto-throw, bot turns, scoring with draw handling, and Play Again that keeps seats/teams/team wins. `finishHand` is exported so the tie branch can be tested directly.
 - state-redactor.ts — [COMPLETE] — rewritten and much smaller. Split 13 hides exactly one thing: an opponent's hand CONTENTS. Own hand is sent in full (sorted), opponents' hands become `null` with `handCount` surviving, and the stack is public in full since every card in it was thrown face-up.
 - types.ts — [COMPLETE] — `ServerPlayer` (seat, team, isBot, 13-card hand) and `GameContext` (seats, stack, team scores/counts, playedRankCounts, botDifficulty, turn deadline, result, teamWins) rewritten for Split 13.
 - lib/deck-utils.ts — [COMPLETE] — `createDeck`/`shuffleDeck` kept; added `dealHands` (four 13-card hands, asserts a full deck), `sortHand` (rank first so equal ranks sit together — it is a matching game) and `emptyRankCounts`.

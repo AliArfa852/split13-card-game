@@ -12,7 +12,8 @@
 // import time, and at the real 20s/1.1s pacing a single hand takes a minute.
 // Dynamic imports below are what make this ordering possible.
 process.env.TURN_TIMER_MS ??= "300";
-process.env.BOT_THINK_MS ??= "1";
+process.env.BOT_THINK_MIN_MS ??= "1";
+process.env.BOT_THINK_MAX_MS ??= "1";
 process.env.LOG_LEVEL ??= "silent";
 
 const { createActor } = await import("xstate");

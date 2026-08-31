@@ -36,8 +36,14 @@ export type { GameContext } from "./types.js";
 const TURN_TIMER_MS = parseInt(process.env.TURN_TIMER_MS || "20000", 10);
 /** How long a bot "thinks" before throwing. Purely cosmetic pacing — without
  *  it three bot seats resolve in the same tick and a human sees the stack jump
- *  three cards with no idea what happened. */
-const BOT_THINK_MS = parseInt(process.env.BOT_THINK_MS || "1100", 10);
+ *  three cards with no idea what happened. Randomized per turn (rather than
+ *  one fixed beat) so bots don't all move at a metronome click, which reads
+ *  as obviously mechanical — a human's turns don't take the same number of
+ *  milliseconds every time either. */
+const BOT_THINK_MIN_MS = parseInt(process.env.BOT_THINK_MIN_MS || "2000", 10);
+const BOT_THINK_MAX_MS = parseInt(process.env.BOT_THINK_MAX_MS || "7000", 10);
+const randomBotThinkMs = () =>
+  BOT_THINK_MIN_MS + Math.random() * (BOT_THINK_MAX_MS - BOT_THINK_MIN_MS);
 /** Beat between the deal and the first turn, so the deal can animate. */
 const DEAL_ANIMATION_MS = 900;
 /** Beat on the scoring screen before the final result is committed. */
@@ -284,7 +290,10 @@ export const gameMachine = setup({
   },
   delays: {
     TURN_TIMER: ({ context }) => context.turnTimerMs,
-    BOT_THINK: BOT_THINK_MS,
+    // A function, not a fixed number: XState calls this fresh every time a
+    // bot enters its turn, so each bot throw gets its own random beat instead
+    // of the whole table sharing one delay value.
+    BOT_THINK: randomBotThinkMs,
     DEAL_ANIMATION: DEAL_ANIMATION_MS,
     SCORING_BEAT: SCORING_DURATION_MS,
   },

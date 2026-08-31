@@ -43,6 +43,10 @@ const selectBoard = (state: UIMachineSnapshot) => {
     rematchVotes: gs?.rematchVotes ?? null,
     hostId: gs?.hostId ?? null,
     serverClockOffset: state.context.serverClockOffset,
+    // Only need the very last entry to know who most recently threw — see
+    // `lastThrowSeat` below. Slicing here (not storing the whole log) keeps
+    // this selector cheap on every broadcast.
+    lastLogEntry: gs?.log.length ? gs.log[gs.log.length - 1] : null,
   };
 };
 
@@ -74,6 +78,35 @@ export const GameBoard = () => {
   const result = b.result;
   const stack = b.stack ?? [];
   const topRank = stack.length ? stack[stack.length - 1].rank : null;
+
+  // Which seat most recently threw, so the newest stack card can fly in from
+  // that direction instead of just appearing. Read off the log rather than
+  // `currentPlayerId` (which has already advanced to the *next* player by
+  // the time this renders) — only a "throw" entry counts: a "capture" entry
+  // clears the stack in the same server update the card was added in, so
+  // there is never a persisted stack state to animate a captured throw into.
+  const lastThrowerId =
+    b.lastLogEntry?.tags.includes("throw") &&
+    !b.lastLogEntry.tags.includes("capture")
+      ? (b.lastLogEntry.actor?.id ?? null)
+      : null;
+  const lastThrowSeat =
+    lastThrowerId && b.players
+      ? (b.players[lastThrowerId]?.seatIndex ?? null)
+      : null;
+  const topCardEnterFrom: "top" | "left" | "right" | null =
+    lastThrowSeat === null || lastThrowSeat === mySeat
+      ? null
+      : lastThrowSeat === positions.top
+        ? "top"
+        : lastThrowSeat === positions.left
+          ? "left"
+          : lastThrowSeat === positions.right
+            ? "right"
+            : null;
+  const topCardEnterId = topCardEnterFrom
+    ? (stack[stack.length - 1]?.id ?? null)
+    : null;
   const isPlaying = b.gameStage === GameStage.PLAYING;
   const endScene =
     b.gameStage === GameStage.SCORING || b.gameStage === GameStage.GAMEOVER;
@@ -129,7 +162,12 @@ export const GameBoard = () => {
 
         <div className="flex min-h-0 flex-1 items-center justify-between gap-2 px-2 md:px-6">
           {seatFor("left")}
-          <TableArea stack={stack} stackValue={b.stackValue} />
+          <TableArea
+            stack={stack}
+            stackValue={b.stackValue}
+            enterFrom={topCardEnterFrom}
+            enterCardId={topCardEnterId}
+          />
           {seatFor("right")}
         </div>
 

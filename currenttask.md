@@ -54,6 +54,29 @@ Removed: `initialPeek` / `finalTurns` / `ability` states, `visibleCards`, `hasPa
 
 ## 3. TO DO
 
+### 3.0 Feel pass (session 3, part 3) — done, not committed
+
+Two things that only show up once you watch a hand play:
+
+- **Bots threw on a metronome.** `BOT_THINK_MS` was one fixed 1100ms beat for
+  every bot on every turn, so the opening read as three cards machine-gunning
+  onto the table. Now `BOT_THINK_MIN_MS`/`BOT_THINK_MAX_MS` (2000/7000) and a
+  delay *function*, which XState re-evaluates on each entry into `botTurn`,
+  so every bot turn draws its own beat. `check:rules` pins both to 1ms so the
+  35-hand sweep still runs in seconds; it passes unchanged.
+- **Only YOUR throws animated.** PlayerHand and TableArea share a
+  `card-${id}` layoutId, so your own card genuinely flies from your hand to
+  the pile — but an opponent's card has no prior on-screen identity to fly
+  from (their hand is card backs; the server never sends their cards), so it
+  just appeared on the stack. TableArea now takes `enterFrom`/`enterCardId`
+  and flies the newly thrown card in from the throwing seat's side. Applies
+  to non-capturing throws only: a capture clears the stack in the same server
+  update the card was added in, so there is no persisted state to animate a
+  captured throw into — that would need its own sweep animation.
+
+Verified: client typecheck 0 errors, `npm run lint` clean, Prettier applied,
+`npm run verify:server` green including `check:rules`.
+
 ### 3.1 Run it and look at it ⚠️ THE NEXT STEP
 
 Everything compiles, but **no one has seen the board yet**. This needs you, because it cannot be done from this session (see §5):
@@ -154,6 +177,20 @@ sweep).
   `progress-tracking.md` for how to give it a `.visualmd` again.
 - `SITE_URL` is a placeholder (`https://split-13.vercel.app`). Set it before
   sharing anything, or every social card names a site that isn't yours.
+- **A capture has no sweep animation.** When a throw captures, the server
+  empties `stack` in the same update it pushed the card into, so the client
+  never sees the pile-with-the-winning-card state. `lastCapture` carries
+  everything needed (who, rank, cardCount, points, occurredAt) to animate the
+  pile flying to the capturing team — nothing renders it yet.
+- **This repo lives in OneDrive, and it actively breaks the build.** Files
+  under `node_modules/` dehydrate to placeholders and surface as missing or
+  "Input/output error" through any non-Windows access: the workspace symlinks
+  (`node_modules/{client,server,shared-types}`) broke twice in one session and
+  `node_modules/eslint/package.json` vanished and came back minutes later.
+  Every mystery "Cannot find module 'shared-types'" / "could not find a
+  declaration file" build failure this session traced back to this, not to
+  code. Fix properly by moving the repo out of OneDrive (e.g. `C:\dev\`) or
+  excluding `node_modules` from sync.
 
 ## 4. Open decisions
 
