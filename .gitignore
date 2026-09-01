@@ -71,4 +71,4 @@ AGENTS.md
 .gemini/
 
 # Obsidian vault settings (personal editor state, not project content)
-design-vault/.obsidian/
+# design-vault/.obsidian/
