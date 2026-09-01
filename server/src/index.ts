@@ -9,6 +9,7 @@ dotenv.config();
 import { gameMachine } from "./game-machine.js";
 import { generatePlayerView } from "./state-redactor.js";
 import logger from "./lib/logger.js";
+import { FixedWindowRateLimiter } from "./lib/fixed-window-rate-limiter.js";
 import {
   InitialPlayerSetupData,
   CreateGamePayload,
@@ -30,6 +31,83 @@ import {
 type GameMachineActorRef = ActorRefFrom<typeof gameMachine>;
 
 logger.info("Server starting with Socket.IO...");
+
+const positiveIntegerFromEnv = (name: string, fallback: number): number => {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const parsed = Number(raw);
+  if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
+  logger.warn({ name, value: raw, fallback }, "Invalid limit; using fallback");
+  return fallback;
+};
+
+const RESOURCE_LIMITS = {
+  maxActiveGames: positiveIntegerFromEnv("MAX_ACTIVE_GAMES", 200),
+  maxHttpBufferSizeBytes: positiveIntegerFromEnv(
+    "MAX_HTTP_BUFFER_SIZE_BYTES",
+    16 * 1024,
+  ),
+  createGame: {
+    requests: positiveIntegerFromEnv("CREATE_GAME_RATE_LIMIT", 3),
+    windowMs: positiveIntegerFromEnv(
+      "CREATE_GAME_RATE_LIMIT_WINDOW_MS",
+      60_000,
+    ),
+  },
+  handshake: {
+    requests: positiveIntegerFromEnv("HANDSHAKE_RATE_LIMIT", 30),
+    windowMs: positiveIntegerFromEnv("HANDSHAKE_RATE_LIMIT_WINDOW_MS", 60_000),
+  },
+  playerAction: {
+    requests: positiveIntegerFromEnv("PLAYER_ACTION_RATE_LIMIT", 60),
+    windowMs: positiveIntegerFromEnv(
+      "PLAYER_ACTION_RATE_LIMIT_WINDOW_MS",
+      10_000,
+    ),
+  },
+  chat: {
+    requests: positiveIntegerFromEnv("CHAT_MESSAGE_RATE_LIMIT", 10),
+    windowMs: positiveIntegerFromEnv(
+      "CHAT_MESSAGE_RATE_LIMIT_WINDOW_MS",
+      10_000,
+    ),
+  },
+};
+
+const TRUST_PROXY =
+  process.env.RENDER === "true" || process.env.TRUST_PROXY === "true";
+
+logger.info(
+  { resourceLimits: RESOURCE_LIMITS, trustProxy: TRUST_PROXY },
+  "Resource limits set",
+);
+
+const gameCreationLimiter = new FixedWindowRateLimiter(
+  RESOURCE_LIMITS.createGame.requests,
+  RESOURCE_LIMITS.createGame.windowMs,
+);
+const handshakeLimiter = new FixedWindowRateLimiter(
+  RESOURCE_LIMITS.handshake.requests,
+  RESOURCE_LIMITS.handshake.windowMs,
+);
+const playerActionLimiter = new FixedWindowRateLimiter(
+  RESOURCE_LIMITS.playerAction.requests,
+  RESOURCE_LIMITS.playerAction.windowMs,
+);
+const chatMessageLimiter = new FixedWindowRateLimiter(
+  RESOURCE_LIMITS.chat.requests,
+  RESOURCE_LIMITS.chat.windowMs,
+);
+
+const rateLimiters = [
+  gameCreationLimiter,
+  handshakeLimiter,
+  playerActionLimiter,
+  chatMessageLimiter,
+];
+setInterval(() => {
+  for (const limiter of rateLimiters) limiter.prune();
+}, 60_000).unref();
 
 const activeGameMachines = new Map<GameId, GameMachineActorRef>();
 const socketSessionMap = new Map<
@@ -140,12 +218,19 @@ const sanitizeChatMessage = (raw: unknown): string | null => {
   return message.length > 0 ? message : null;
 };
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const CORS_ORIGIN = (
-  process.env.CORS_ORIGIN ??
-  "http://localhost:3000,https://check-the-game.vercel.app"
+  process.env.CORS_ORIGIN ?? (IS_PRODUCTION ? "" : "http://localhost:3000")
 )
   .split(",")
-  .map((o) => o.trim());
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+if (IS_PRODUCTION && CORS_ORIGIN.length === 0) {
+  throw new Error(
+    "CORS_ORIGIN must list at least one allowed frontend origin in production.",
+  );
+}
 
 logger.info({ corsOrigins: CORS_ORIGIN }, "CORS origins set");
 
@@ -168,10 +253,35 @@ export const io = new SocketIOServer<
     origin: CORS_ORIGIN,
     methods: ["GET", "POST"],
   },
+  // CORS only controls which browser responses may be read. Engine.IO's
+  // admission hook is what refuses an unlisted WebSocket Origin before a
+  // Socket.IO connection exists. This is a browser boundary, not client
+  // authentication: non-browser clients can forge the header, so the resource
+  // limits above remain necessary.
+  allowRequest: (request, callback) => {
+    if (!IS_PRODUCTION) {
+      callback(null, true);
+      return;
+    }
+
+    const origin = request.headers.origin;
+    const allowed = typeof origin === "string" && CORS_ORIGIN.includes(origin);
+    if (!allowed) {
+      logger.warn(
+        { origin: origin ?? null },
+        "Rejected connection from an unauthorized origin",
+      );
+    }
+    callback(null, allowed);
+  },
   connectionStateRecovery: {
     maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes buffer
     skipMiddlewares: true, // keep auth cost low during recovery
   },
+  // Client messages are names, lobby codes and small action payloads. Keeping
+  // the Engine.IO default of 1 MB would allow far more parsing/allocation than
+  // this protocol ever needs before application validation gets a chance.
+  maxHttpBufferSize: RESOURCE_LIMITS.maxHttpBufferSizeBytes,
   // Both sides notice a dead link after pingInterval + pingTimeout, so the
   // engine.io defaults (25s + 20s) leave a player staring at a frozen board
   // for 45 seconds. Getting it wrong in this direction is the cheap mistake:
@@ -187,6 +297,62 @@ export const io = new SocketIOServer<
 
 io.on("connection", (socket: Socket) => {
   logger.info({ socketId: socket.id }, "New connection");
+
+  // Render puts the real client address first in X-Forwarded-For. Trusting a
+  // client-supplied header on a direct deployment would let callers choose
+  // their own rate-limit key, so proxy headers are used only on Render or when
+  // an operator explicitly enables TRUST_PROXY.
+  const forwardedFor = socket.handshake.headers["x-forwarded-for"];
+  const forwardedClientAddress = (
+    Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor
+  )
+    ?.split(",")[0]
+    ?.trim();
+  const clientAddress =
+    (TRUST_PROXY && forwardedClientAddress) || socket.handshake.address;
+
+  const acknowledgedRequestIsLimited = (
+    limiter: FixedWindowRateLimiter,
+    key: string,
+    eventName: SocketEventName,
+  ): boolean => {
+    const result = limiter.consume(key);
+    if (result.allowed) return false;
+    if (result.firstRejection) {
+      logger.warn(
+        {
+          socketId: socket.id,
+          eventName,
+          retryAfterMs: result.retryAfterMs,
+        },
+        "Socket request rate limit reached",
+      );
+    }
+    return true;
+  };
+
+  const rejectFireAndForgetRequest = (
+    limiter: FixedWindowRateLimiter,
+    key: string,
+    eventName: SocketEventName,
+  ): boolean => {
+    const result = limiter.consume(key);
+    if (result.allowed) return false;
+    if (result.firstRejection) {
+      logger.warn(
+        {
+          socketId: socket.id,
+          eventName,
+          retryAfterMs: result.retryAfterMs,
+        },
+        "Socket request rate limit reached",
+      );
+      socket.emit(SocketEventName.ERROR_MESSAGE, {
+        message: "You are sending requests too quickly. Please slow down.",
+      });
+    }
+    return true;
+  };
 
   const registerSocketSession = (gameId: GameId, playerId: PlayerId) => {
     // Remove any previous socketId mapped to this player
@@ -280,6 +446,58 @@ io.on("connection", (socket: Socket) => {
       callback: (response: CreateGameResponse) => void,
     ) => {
       try {
+        if (
+          acknowledgedRequestIsLimited(
+            handshakeLimiter,
+            clientAddress,
+            SocketEventName.CREATE_GAME,
+          )
+        ) {
+          if (callback)
+            callback({
+              success: false,
+              message: "Too many requests. Please wait and try again.",
+            });
+          return;
+        }
+
+        if (getSocketSession()) {
+          if (callback)
+            callback({
+              success: false,
+              message: "Leave your current game before creating another.",
+            });
+          return;
+        }
+
+        if (
+          acknowledgedRequestIsLimited(
+            gameCreationLimiter,
+            clientAddress,
+            SocketEventName.CREATE_GAME,
+          )
+        ) {
+          if (callback)
+            callback({
+              success: false,
+              message: "Too many requests. Please wait and try again.",
+            });
+          return;
+        }
+
+        if (activeGameMachines.size >= RESOURCE_LIMITS.maxActiveGames) {
+          logger.warn(
+            { activeGames: activeGameMachines.size },
+            "Create game rejected: active game limit reached",
+          );
+          if (callback)
+            callback({
+              success: false,
+              message: "The server is at capacity. Please try again later.",
+            });
+          return;
+        }
+
         const gameId = newGameId();
         const playerId = nanoid();
         // Split 13's table size is fixed at SEAT_COUNT, so bot difficulty is
@@ -418,6 +636,21 @@ io.on("connection", (socket: Socket) => {
       callback: (response: JoinGameResponse) => void,
     ) => {
       try {
+        if (
+          acknowledgedRequestIsLimited(
+            handshakeLimiter,
+            clientAddress,
+            SocketEventName.JOIN_GAME,
+          )
+        ) {
+          if (callback)
+            callback({
+              success: false,
+              message: "Too many requests. Please wait and try again.",
+            });
+          return;
+        }
+
         // Codes are generated uppercase; accept any casing from typed input.
         gameId = gameId.trim().toUpperCase();
         const gameActor = activeGameMachines.get(gameId);
@@ -518,6 +751,21 @@ io.on("connection", (socket: Socket) => {
       callback: (r: AttemptRejoinResponse) => void,
     ) => {
       try {
+        if (
+          acknowledgedRequestIsLimited(
+            handshakeLimiter,
+            clientAddress,
+            SocketEventName.ATTEMPT_REJOIN,
+          )
+        ) {
+          if (callback)
+            callback({
+              success: false,
+              message: "Too many requests. Please wait and try again.",
+            });
+          return;
+        }
+
         const { gameId, playerId, token } = data;
         const gameActor = activeGameMachines.get(gameId);
 
@@ -623,6 +871,20 @@ io.on("connection", (socket: Socket) => {
     SocketEventName.PLAYER_ACTION,
     (action: { type: PlayerActionType; payload?: any }) => {
       const session = getSocketSession();
+      const rateLimitKey = session
+        ? seatKey(session.gameId, session.playerId)
+        : clientAddress;
+      if (
+        action?.type !== PlayerActionType.LEAVE_GAME &&
+        rejectFireAndForgetRequest(
+          playerActionLimiter,
+          rateLimitKey,
+          SocketEventName.PLAYER_ACTION,
+        )
+      ) {
+        return;
+      }
+
       if (!session) {
         logger.warn(
           { action, socketId: socket.id },
@@ -674,6 +936,15 @@ io.on("connection", (socket: Socket) => {
       );
 
       if (action.type === PlayerActionType.SEND_CHAT_MESSAGE) {
+        if (
+          rejectFireAndForgetRequest(
+            chatMessageLimiter,
+            rateLimitKey,
+            SocketEventName.SEND_CHAT_MESSAGE,
+          )
+        ) {
+          return;
+        }
         sendChatAsSessionPlayer(gameActor, session, action.payload?.message);
         return;
       }
@@ -709,6 +980,19 @@ io.on("connection", (socket: Socket) => {
     SocketEventName.SEND_CHAT_MESSAGE,
     (payload: Omit<ChatMessage, "id" | "timestamp">) => {
       const session = getSocketSession();
+      const rateLimitKey = session
+        ? seatKey(session.gameId, session.playerId)
+        : clientAddress;
+      if (
+        rejectFireAndForgetRequest(
+          chatMessageLimiter,
+          rateLimitKey,
+          SocketEventName.SEND_CHAT_MESSAGE,
+        )
+      ) {
+        return;
+      }
+
       if (!session) {
         logger.warn(
           { payload, socketId: socket.id },
