@@ -11,6 +11,7 @@ _[Rules](docs/GAME_RULES.md)_ · _[Architecture](docs/ARCHITECTURE.md)_ · _[Con
 The deck is split thirteen cards each between four players, seated as two
 teams of two. You always see your own hand.
 
+
 On your turn you throw one card onto the table stack. If its rank matches the
 card on top, you take the whole stack — every card that has piled up since the
 last capture — and it scores for your team. If it does not match, your card
