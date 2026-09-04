@@ -8,7 +8,7 @@
 // build. Neither is a URL anyone shares.
 // TODO: point this at your own deployment before sharing anything. Until it
 // is right, every social card and sitemap entry names somebody else's site.
-export const SITE_URL = "https://split-13.vercel.app";
+export const SITE_URL = "https://splid13.vercel.app";
 
 // Read by the root description, the JSON-LD beside it and the manifest. Kept in
 // one place because the manifest is the copy that quietly falls behind when it
